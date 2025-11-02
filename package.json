@@ -1,0 +1,18 @@
+{
+  "name": "sisyphus-llm",
+  "version": "1.0.0",
+  "description": "A beautiful visualization of LLMs attempting impossible tasks",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["llm", "visualization", "sisyphus", "ai", "art"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "@anthropic-ai/sdk": "^0.17.1"
+  }
+}
