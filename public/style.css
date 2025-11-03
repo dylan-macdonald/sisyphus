@@ -246,7 +246,7 @@ body {
     position: relative;
     display: flex;
     flex-direction: column;
-    justify-content: flex-start; /* Start from top */
+    justify-content: flex-end; /* Anchor to bottom */
 }
 
 /* Prevent any scrollbar from appearing */
@@ -259,15 +259,15 @@ body {
     scrollbar-width: none;  /* Firefox */
 }
 
-/* Fade effect at bottom to show content disappearing into time */
-.output-container::after {
+/* Fade effect at top to show content disappearing into time */
+.output-container::before {
     content: '';
     position: absolute;
-    bottom: 0;
+    top: 0;
     left: 0;
     right: 0;
     height: 120px;
-    background: linear-gradient(0deg, var(--bg) 0%, transparent 100%);
+    background: linear-gradient(180deg, var(--bg) 0%, transparent 100%);
     z-index: 5;
     pointer-events: none;
 }
@@ -450,7 +450,7 @@ body {
         height: calc(100vh - 100px); /* Subtract stats bar height */
     }
     
-    .output-container::after {
+    .output-container::before {
         right: 0;
         height: 80px;
     }
