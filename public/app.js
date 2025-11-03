@@ -18,7 +18,7 @@ const elements = {
 };
 
 // Constants
-const TOKEN_DISPLAY_DELAY = 50; // ms between tokens
+const TOKEN_DISPLAY_DELAY = 120; // ms between tokens (human readable speed)
 const CYCLE_PAUSE = 2000; // ms pause between cycles
 
 // Initialize

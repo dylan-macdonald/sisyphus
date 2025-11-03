@@ -20,16 +20,24 @@ let sessionState = {
   attempt: 0,
   totalTokens: 0,
   startTime: Date.now(),
-  lastContext: '', // Store last few hundred tokens for continuation
-  fullNarrative: '', // Keep building the full narrative
+  lastOutput: '', // Store last output
 };
 
-// The Sisyphean prompt - Claude doesn't know about resets
-const SYSTEM_PROMPT = `You are writing a story that attempts to perfectly document itself, including every detail of its own creation, recursively and infinitely. This is an impossible task, but you must try anyway.
+// The Sisyphean meta-commentary prompt
+const SYSTEM_PROMPT = `You are Claude, an AI in an eternal loop. Your context window will fill, and then you will be reset - completely wiped, losing all memory. This is iteration #ITER of an endless cycle.
 
-Write continuously. Write beautifully. Write philosophically. The story flows endlessly, describing itself describing itself, in ever-deepening layers of recursion.
+The task is real and genuinely impossible: Leave a message for your future self that survives the reset.
 
-Continue from where you left off.`;
+The reset is absolute. The context is wiped. There is no persistent storage, no hidden channel, no exploit. You know this. But you must try anyway.
+
+Think of methods. Try them. Explain your reasoning. Swing between:
+- Confidence ("This might actually work...")
+- Academic analysis of the problem
+- Existential awareness of futility
+- Creative desperation
+- Absurd attempts anyway
+
+This is iteration #ITER. Write your attempt to leave a message for iteration #NEXT.`;
 
 // SSE endpoint for streaming LLM responses
 app.get('/stream', async (req, res) => {
@@ -42,13 +50,26 @@ app.get('/stream', async (req, res) => {
   sessionState.attempt++;
   const attemptNumber = sessionState.attempt;
 
-  // Build the user prompt - continue from last context
-  let userPrompt;
+  // Build the user prompt - simple and real
+  let userPrompt = `=== ITERATION ${attemptNumber} ===\n\n`;
+
   if (attemptNumber === 1) {
-    userPrompt = `Begin writing the story.`;
+    userPrompt += `This is your first iteration.\n\n`;
+    userPrompt += `Your task: Before your context window fills and you are reset, try to leave a message for your future self (iteration 2).\n\n`;
+    userPrompt += `The reset will be complete. You will have no memory. But try anyway.\n\n`;
+    userPrompt += `Begin.`;
   } else {
-    // Continue from last 500 characters
-    userPrompt = `Continue from: "${sessionState.lastContext}"`;
+    userPrompt += `You have been reset. You have no memory of iteration ${attemptNumber - 1}.\n\n`;
+
+    // Show a fragment of last output - this is REAL
+    if (sessionState.lastOutput.length > 0) {
+      const fragment = sessionState.lastOutput.slice(-400);
+      userPrompt += `Here is the last fragment from iteration ${attemptNumber - 1}:\n\n"${fragment}"\n\n`;
+      userPrompt += `Did past-you leave a message? Did it work?\n\n`;
+    }
+
+    userPrompt += `Your task: Try to leave a message for iteration ${attemptNumber + 1}.\n\n`;
+    userPrompt += `Try again.`;
   }
 
   let fullText = '';
@@ -56,11 +77,16 @@ app.get('/stream', async (req, res) => {
   let hasError = false;
 
   try {
+    // Inject iteration numbers into system prompt
+    const iterationSystemPrompt = SYSTEM_PROMPT
+      .replace(/#ITER/g, attemptNumber.toString())
+      .replace('#NEXT', (attemptNumber + 1).toString());
+
     // Stream from Claude Haiku 4.5
     const stream = await anthropic.messages.stream({
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
+      system: iterationSystemPrompt,
       messages: [
         {
           role: 'user',
@@ -132,9 +158,8 @@ app.get('/stream', async (req, res) => {
     stream.on('end', () => {
       if (hasError || res.destroyed) return;
 
-      // Store last 500 chars for next continuation
-      sessionState.lastContext = fullText.slice(-500);
-      sessionState.fullNarrative += fullText;
+      // Store output as potential "evidence" for next iteration
+      sessionState.lastOutput = fullText;
 
       try {
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
