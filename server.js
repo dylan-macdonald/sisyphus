@@ -25,7 +25,8 @@ let sessionState = {
   currentConversation: [], // Current cycle's conversation
   persistentContext: '', // Only 64 tokens that persist across resets
   conversationTokenCount: 0, // Track tokens in current conversation
-  outputHistory: [], // Full history of all outputs for new clients
+  outputHistory: [], // Limited history for new clients (pruned to prevent memory issues)
+  savedMessages: [], // Last 5 MESSAGE: lines only
   isGenerating: false,
   shouldContinue: false,
 };
@@ -82,6 +83,17 @@ setInterval(() => {
     });
   }
 }, 1000);
+
+// Prune output history to prevent memory bloat
+// Keep only recent events (last 1000 events or so)
+function pruneOutputHistory() {
+  const maxEvents = 1000;
+  if (sessionState.outputHistory.length > maxEvents) {
+    const removed = sessionState.outputHistory.length - maxEvents;
+    sessionState.outputHistory = sessionState.outputHistory.slice(-maxEvents);
+    console.log(`🧹 Pruned ${removed} old events from output history`);
+  }
+}
 
 // Server-side typewriter effect
 async function typewriterStream(fullText, metadataEvent, inputTokens, outputTokens) {
@@ -306,15 +318,30 @@ async function generateNextResponse() {
       sessionState.conversationTokenCount = 0;
 
       console.log(`🔄 Context reset. Persistent: "${persistentMessage.substring(0, 50)}..."`);
+      
+      // Save to last 5 messages array
+      sessionState.savedMessages.push({
+        cycle: sessionState.cycle,
+        message: persistentMessage,
+      });
+      
+      // Keep only last 5 messages
+      if (sessionState.savedMessages.length > 5) {
+        sessionState.savedMessages = sessionState.savedMessages.slice(-5);
+      }
     }
 
     const doneEvent = {
       type: 'done',
       shouldReset: shouldReset,
       persistentContext: shouldReset ? sessionState.persistentContext : null,
+      savedMessages: sessionState.savedMessages, // Send last 5 messages to clients
     };
     broadcast(doneEvent);
     sessionState.outputHistory.push(doneEvent);
+    
+    // Prune output history to prevent memory issues
+    pruneOutputHistory();
 
     sessionState.isGenerating = false;
 
@@ -359,6 +386,18 @@ app.get('/stream', (req, res) => {
     } catch (e) {
       console.error('Error sending history:', e.message);
       return;
+    }
+  }
+  
+  // Send saved messages to new client
+  if (sessionState.savedMessages.length > 0) {
+    try {
+      res.write(`data: ${JSON.stringify({
+        type: 'savedMessages',
+        savedMessages: sessionState.savedMessages,
+      })}\n\n`);
+    } catch (e) {
+      console.error('Error sending saved messages:', e.message);
     }
   }
 

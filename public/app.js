@@ -83,22 +83,21 @@ function updateCurrentMessage(text) {
   }
 }
 
-// Add message to history
-function addMessageToHistory(message, cycle) {
-  if (!message) return;
+// Update entire message history from server (only last 5)
+function updateMessageHistory(savedMessages) {
+  if (!savedMessages || savedMessages.length === 0) return;
   
-  state.messageHistory.push({ message, cycle });
+  // Clear existing history
+  messageHistoryEl.innerHTML = '';
+  state.messageHistory = savedMessages;
   
-  // Clear empty state
-  if (messageHistoryEl.querySelector('.message-history-empty')) {
-    messageHistoryEl.innerHTML = '';
-  }
-  
-  // Add new message item
-  const item = document.createElement('div');
-  item.className = 'message-history-item';
-  item.innerHTML = `<span>CYCLE ${cycle}</span>${message}`;
-  messageHistoryEl.appendChild(item);
+  // Render all saved messages
+  savedMessages.forEach(({ cycle, message }) => {
+    const item = document.createElement('div');
+    item.className = 'message-history-item';
+    item.innerHTML = `<span>CYCLE ${cycle}</span>${message}`;
+    messageHistoryEl.appendChild(item);
+  });
 }
 
 // Track current paragraph for direct rendering
@@ -190,13 +189,13 @@ function connectToServer() {
           break;
           
         case 'done':
+          // Update message history from server (only last 5 messages)
+          if (data.savedMessages) {
+            updateMessageHistory(data.savedMessages);
+          }
+          
           if (data.shouldReset) {
-            // Save current message to history
-            if (state.currentMessage) {
-              addMessageToHistory(state.currentMessage, currentCycle);
-            }
-            
-            // Reset current message
+            // Reset current message display
             state.currentMessage = '';
             currentMessageEl.textContent = '—';
           }
@@ -208,6 +207,13 @@ function connectToServer() {
         case 'timer':
           // Update time from server
           updateTime(data.streamingTime);
+          break;
+          
+        case 'savedMessages':
+          // Receive saved messages from server (for new clients)
+          if (data.savedMessages) {
+            updateMessageHistory(data.savedMessages);
+          }
           break;
           
         case 'error':
