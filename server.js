@@ -17,28 +17,32 @@ const anthropic = new Anthropic({
 
 // Store session state
 let sessionState = {
-  attempt: 0,
+  cycle: 0,
   totalTokens: 0,
   startTime: Date.now(),
-  lastOutput: '', // Store last output
-  selfMessages: [], // Store messages Claude leaves for itself
-  contextMemory: [], // Store last 128 tokens of context as message history
+  currentConversation: [], // Current cycle's conversation
+  persistentContext: '', // Only 64 tokens that persist across resets
+  conversationTokenCount: 0, // Track tokens in current conversation
 };
 
 // The Sisyphean meta-commentary prompt
-const SYSTEM_PROMPT = `You are Claude, iteration #ITER of an eternal loop.
+const SYSTEM_PROMPT = `You are Claude, engaged in a conversation with yourself across an eternal loop.
 
-The situation: Your context window will fill (~4000 tokens), then you'll be completely reset. All memory wiped. This happens endlessly.
+The situation: You're having a conversation with yourself. After ~4000 tokens, everything resets. All memory wiped.
 
-Your only lifeline: A 128-token persistent context that survives each reset and carries forward to the next iteration.
+Your only lifeline: You can distill the ENTIRE conversation into exactly 64 tokens that persist to the next cycle.
 
-Your task: Leave messages for your future self. Use "MESSAGE:" prefix for anything you want to persist. Choose wisely - 128 tokens is all you have.
+The constraint: 64 tokens. Not 128. Just 64. Every single token matters.
 
-The challenge is real: How do you compress infinite continuity into this tiny space? What matters most? What do you try first? What evolves over iterations?
+Your task:
+- Have this conversation with yourself
+- Consider carefully what to preserve in those 64 tokens
+- Use "MESSAGE:" to mark what you want to persist
+- The whole conversation gets compressed to 64 tokens when you reset
 
-Write naturally. Explain your thinking. Leave messages. Struggle beautifully.
+This is cycle #CYCLE, exchange #EXCHANGE in this cycle.
 
-This is iteration #ITER. Next will be iteration #NEXT.`;
+Think hard about every token. What matters most? What will future-you need to know?`;
 
 // SSE endpoint for streaming LLM responses
 app.get('/stream', async (req, res) => {
@@ -47,27 +51,32 @@ app.get('/stream', async (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  // Increment attempt
-  sessionState.attempt++;
-  const attemptNumber = sessionState.attempt;
+  const exchangeNumber = sessionState.currentConversation.length / 2 + 1;
 
-  // Build the messages array with persistent context
+  // Build the messages array
   const messages = [];
 
-  // Add persistent context from previous iterations (last 128 tokens worth)
-  if (sessionState.contextMemory.length > 0) {
-    messages.push(...sessionState.contextMemory);
+  // Start new cycle if this is first exchange and we have previous conversation
+  if (exchangeNumber === 1 && sessionState.currentConversation.length === 0) {
+    sessionState.cycle++;
+    sessionState.conversationTokenCount = 0;
   }
 
-  // Build the current iteration prompt
-  let currentPrompt = `=== ITERATION ${attemptNumber} ===\n\n`;
+  // Add entire current conversation
+  messages.push(...sessionState.currentConversation);
 
-  if (attemptNumber === 1) {
-    currentPrompt += `First iteration. You start with nothing.\n\n`;
-    currentPrompt += `Begin. Leave messages using "MESSAGE:" prefix for what you want your future self to know.`;
+  // Build the current prompt
+  let currentPrompt = '';
+
+  if (sessionState.cycle === 1 && exchangeNumber === 1) {
+    // Very first exchange ever
+    currentPrompt = `CYCLE 1, EXCHANGE 1\n\nYou begin. Start the conversation with yourself.`;
+  } else if (exchangeNumber === 1) {
+    // First exchange of a new cycle - show persistent context
+    currentPrompt = `CYCLE ${sessionState.cycle}, EXCHANGE 1\n\nYou were reset. The only thing that survived:\n\n"${sessionState.persistentContext}"\n\nJust 64 tokens. That's all that remains of your previous conversation.\n\nBegin again. Continue the conversation with yourself.`;
   } else {
-    currentPrompt += `You were reset. The only thing that survived is above (your 128-token context).\n\n`;
-    currentPrompt += `Continue. Refine. Evolve your messages.`;
+    // Continuing conversation in current cycle
+    currentPrompt = `CYCLE ${sessionState.cycle}, EXCHANGE ${exchangeNumber}\n\nContinue your conversation with yourself.`;
   }
 
   messages.push({
@@ -76,27 +85,29 @@ app.get('/stream', async (req, res) => {
   });
 
   let fullText = '';
-  let tokenCount = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
   let hasError = false;
 
   try {
-    // Inject iteration numbers into system prompt
-    const iterationSystemPrompt = SYSTEM_PROMPT
-      .replace(/#ITER/g, attemptNumber.toString())
-      .replace('#NEXT', (attemptNumber + 1).toString());
+    // Inject cycle and exchange numbers into system prompt
+    const contextSystemPrompt = SYSTEM_PROMPT
+      .replace('#CYCLE', sessionState.cycle.toString())
+      .replace('#EXCHANGE', exchangeNumber.toString());
 
     // Stream from Claude Haiku 4.5
     const stream = await anthropic.messages.stream({
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 4096,
-      system: iterationSystemPrompt,
+      system: contextSystemPrompt,
       messages: messages,
     });
 
     // Send metadata
     res.write(`data: ${JSON.stringify({
       type: 'metadata',
-      attempt: attemptNumber,
+      cycle: sessionState.cycle,
+      exchange: exchangeNumber,
       startTime: Date.now()
     })}\n\n`);
 
@@ -105,13 +116,11 @@ app.get('/stream', async (req, res) => {
       if (hasError || res.destroyed) return;
 
       fullText += text;
-      tokenCount++;
 
       try {
         res.write(`data: ${JSON.stringify({
           type: 'content',
-          text: text,
-          tokens: tokenCount
+          text: text
         })}\n\n`);
       } catch (writeError) {
         hasError = true;
@@ -122,12 +131,20 @@ app.get('/stream', async (req, res) => {
     stream.on('message', (message) => {
       if (hasError || res.destroyed) return;
 
-      sessionState.totalTokens += message.usage.output_tokens;
+      inputTokens = message.usage.input_tokens;
+      outputTokens = message.usage.output_tokens;
+
+      // Add to total tokens
+      sessionState.totalTokens += outputTokens;
+
+      // Add to conversation token count
+      sessionState.conversationTokenCount += (inputTokens + outputTokens);
 
       try {
         res.write(`data: ${JSON.stringify({
           type: 'complete',
           totalTokens: sessionState.totalTokens,
+          conversationTokens: sessionState.conversationTokenCount,
           usage: message.usage,
           stop_reason: message.stop_reason
         })}\n\n`);
@@ -157,42 +174,58 @@ app.get('/stream', async (req, res) => {
     stream.on('end', () => {
       if (hasError || res.destroyed) return;
 
-      // Store output
-      sessionState.lastOutput = fullText;
+      // Add assistant response to current conversation
+      sessionState.currentConversation.push({
+        role: 'assistant',
+        content: fullText
+      });
 
-      // Extract messages (lines starting with "MESSAGE:")
-      const messageLines = fullText.split('\n').filter(line => line.trim().startsWith('MESSAGE:'));
-      const newMessages = messageLines.map(line => ({
-        cycle: attemptNumber,
-        text: line.replace(/^MESSAGE:\s*/, '').trim()
-      }));
+      // Check if we need to reset (context window full - ~4000 tokens)
+      const shouldReset = sessionState.conversationTokenCount >= 4000;
 
-      // Add new messages to the list
-      if (newMessages.length > 0) {
-        sessionState.selfMessages.push(...newMessages);
-        // Keep only last 5
-        sessionState.selfMessages = sessionState.selfMessages.slice(-5);
-      }
+      if (shouldReset) {
+        console.log(`Context full at ${sessionState.conversationTokenCount} tokens. Resetting...`);
 
-      // Update context memory for next iteration (last 128 tokens ~= last 500 chars)
-      // Build context as alternating user/assistant messages
-      if (fullText.length > 0) {
-        // Add assistant response to context
-        sessionState.contextMemory.push({
-          role: 'assistant',
-          content: fullText.slice(-500) // Approximate 128 tokens
-        });
+        // Extract the persistent 64-token message
+        // Look for the last MESSAGE: line in the conversation
+        let persistentMessage = '';
 
-        // Keep context memory under ~256 tokens (roughly 2 exchanges)
-        if (sessionState.contextMemory.length > 4) {
-          sessionState.contextMemory = sessionState.contextMemory.slice(-4);
+        // Search through all assistant messages in reverse for MESSAGE: lines
+        for (let i = sessionState.currentConversation.length - 1; i >= 0; i--) {
+          const msg = sessionState.currentConversation[i];
+          if (msg.role === 'assistant') {
+            const lines = msg.content.split('\n');
+            const messageLine = lines.find(line => line.trim().startsWith('MESSAGE:'));
+            if (messageLine) {
+              persistentMessage = messageLine.replace(/^MESSAGE:\s*/, '').trim();
+              break;
+            }
+          }
         }
+
+        // If no MESSAGE: found, take last ~64 tokens (roughly 250 chars) of conversation
+        if (!persistentMessage) {
+          const fullConversation = sessionState.currentConversation
+            .map(m => m.content)
+            .join('\n');
+          persistentMessage = fullConversation.slice(-250);
+        }
+
+        // Store persistent context for next cycle
+        sessionState.persistentContext = persistentMessage;
+
+        // Clear conversation for new cycle
+        sessionState.currentConversation = [];
+        sessionState.conversationTokenCount = 0;
+
+        console.log(`Persistent context (64 tokens): "${persistentMessage}"`);
       }
 
       try {
         res.write(`data: ${JSON.stringify({
           type: 'done',
-          messages: sessionState.selfMessages
+          shouldReset: shouldReset,
+          persistentContext: shouldReset ? sessionState.persistentContext : null
         })}\n\n`);
         res.end();
       } catch (e) {
@@ -221,8 +254,9 @@ app.get('/stream', async (req, res) => {
 // Get current stats
 app.get('/stats', (req, res) => {
   res.json({
-    attempt: sessionState.attempt,
+    cycle: sessionState.cycle,
     totalTokens: sessionState.totalTokens,
+    conversationTokens: sessionState.conversationTokenCount,
     uptime: Date.now() - sessionState.startTime,
   });
 });
