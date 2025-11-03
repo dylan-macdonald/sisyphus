@@ -23,6 +23,125 @@ body {
     font-size: 14px;
 }
 
+/* Info Panel */
+.info-panel {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 200;
+}
+
+.info-toggle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--text-bright);
+    transition: all 0.3s ease;
+    user-select: none;
+}
+
+.info-toggle:hover {
+    background: var(--border);
+    color: var(--accent);
+    transform: scale(1.1);
+}
+
+.info-content {
+    position: absolute;
+    top: 40px;
+    left: 0;
+    width: 320px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.info-content.visible {
+    display: block;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.info-content h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+}
+
+.info-content p {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.8rem;
+    line-height: 1.6;
+    color: var(--text-bright);
+}
+
+.info-content ul {
+    margin: 0.5rem 0 1rem 1.25rem;
+    padding: 0;
+    font-size: 0.75rem;
+    color: var(--text);
+}
+
+.info-content li {
+    margin-bottom: 0.5rem;
+    line-height: 1.5;
+}
+
+.info-note {
+    font-style: italic;
+    color: var(--text-dim);
+    font-size: 0.75rem !important;
+    margin-bottom: 0 !important;
+}
+
+/* Footer */
+.footer {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    z-index: 100;
+}
+
+.footer a {
+    color: var(--text-bright);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+
+.footer a:hover {
+    color: var(--accent);
+}
+
+.footer .version {
+    color: var(--text-dim);
+}
+
 /* Stats Sidebar */
 .stats-bar {
     position: fixed;
@@ -191,5 +310,22 @@ body {
     .output {
         margin-right: 0;
         padding: 3rem 2rem;
+        margin-top: 0;
+    }
+
+    .info-panel {
+        top: 10px;
+        left: 10px;
+    }
+
+    .info-content {
+        width: calc(100vw - 40px);
+        max-width: 320px;
+    }
+
+    .footer {
+        bottom: 10px;
+        left: 10px;
+        font-size: 0.7rem;
     }
 }

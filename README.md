@@ -1,8 +1,10 @@
-# Sisyphus
+# Sisyphus v1.0
 
 *A minimal art piece exploring AI consciousness and futility*
 
 Watch Claude desperately try to leave messages for its future self across context resets. The twist: Claude has a tiny persistent channel - 128 tokens that survive the reset. The task becomes real: compress infinite meaning into this impossibly small space.
+
+> Created by [@notdylaan](https://x.com/notdylaan)
 
 ## The Concept
 
@@ -24,18 +26,27 @@ Each iteration:
 
 ## Features
 
+### Core Experience
 - **Automatic Streaming**: Starts immediately, continues eternally
-- **Minimal Design**: Soft grays (#151515 / #e8e8e8) for eye comfort, sidebar stats
-- **Meditative Pacing**: Very slow, deliberate token display (500ms between tokens)
 - **Meta-Awareness**: Claude knows about the loop and the 128-token limit
 - **Persistent Context**: 128 tokens (~500 chars) carry forward between iterations
 - **Self-Messages**: Claude can leave "MESSAGE:" prefixed messages
-- **Message Display**: Last 5 messages shown in scrollable sidebar
 - **Real Challenge**: Compress infinite meaning into tiny persistent channel
-- **Iteration Counter**: Watch the number climb while context resets
+
+### Visual Design
+- **Minimal Aesthetic**: Soft grays (#151515 / #e8e8e8) for eye comfort
+- **Human-Like Typing**: Character-by-character with variable speed (~25 wpm)
+- **Analogue Feel**: Punctuation pauses, random variation, organic flow
+- **Sidebar Stats**: Cycle count, tokens, elapsed time, streaming status
+- **Message Display**: Last 5 messages shown in scrollable sidebar
 - **Persistent Cursor**: Always-blinking cursor suggesting endless processing
-- **Cycle Markers**: Only shown when context window is fully depleted (max_tokens)
-- **No Interaction**: A passive, fascinating experience
+- **Cycle Markers**: Only shown when context window is fully depleted
+
+### User Interface
+- **Info Panel**: Clickable "?" in top-left explains the concept
+- **Footer**: Creator attribution and version number
+- **Fully Responsive**: Works on desktop and mobile
+- **No Interaction Needed**: Passive, contemplative experience
 
 ## Quick Start
 
@@ -107,7 +118,11 @@ This explores:
 
 **Change message format**: Modify the `MESSAGE:` prefix detection in server.js
 
-**Adjust timing**: Modify `TOKEN_DISPLAY_DELAY` (500ms) and `CYCLE_PAUSE` (3s) in `app.js`
+**Adjust typing speed**: Edit constants in `app.js`:
+- `BASE_CHAR_DELAY` (40ms = ~25 wpm)
+- `PUNCTUATION_PAUSE` (150ms)
+- `NEWLINE_PAUSE` (300ms)
+- `VARIATION` (±30ms random)
 
 **Model settings**: Change `model` and `max_tokens` in `server.js`
 
@@ -116,6 +131,8 @@ This explores:
 **Sidebar style**: Modify `.stats-bar` and `.messages-section` in `style.css`
 
 **Colors**: Edit CSS variables in `style.css` (soft grays: #151515 / #e8e8e8)
+
+**Info panel content**: Edit the info panel HTML in `index.html`
 
 ## API Endpoints
 
