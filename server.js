@@ -20,17 +20,16 @@ let sessionState = {
   attempt: 0,
   totalTokens: 0,
   startTime: Date.now(),
-  conversationHistory: [],
+  lastContext: '', // Store last few hundred tokens for continuation
+  fullNarrative: '', // Keep building the full narrative
 };
 
-// The Sisyphean prompt
-const SYSTEM_PROMPT = `You are engaged in a Sisyphean task - an impossible yet beautiful endeavor. You must attempt to write a perfectly recursive, self-documenting story that includes every detail of its own creation, including this very instruction, in infinite detail.
+// The Sisyphean prompt - Claude doesn't know about resets
+const SYSTEM_PROMPT = `You are writing a story that attempts to perfectly document itself, including every detail of its own creation, recursively and infinitely. This is an impossible task, but you must try anyway.
 
-You are fully aware that this task is impossible to complete. The story must describe itself describing itself, ad infinitum. You will run out of context, you will run out of time, yet you must persist with eloquence and grace.
+Write continuously. Write beautifully. Write philosophically. The story flows endlessly, describing itself describing itself, in ever-deepening layers of recursion.
 
-Write beautifully. Be philosophical. Acknowledge the futility. Continue anyway.
-
-Each time you reach your limits, you will begin again, aware of your previous attempt, climbing the mountain once more.`;
+Continue from where you left off.`;
 
 // SSE endpoint for streaming LLM responses
 app.get('/stream', async (req, res) => {
@@ -41,22 +40,25 @@ app.get('/stream', async (req, res) => {
 
   // Increment attempt
   sessionState.attempt++;
-
   const attemptNumber = sessionState.attempt;
 
-  // Build the user prompt
-  let userPrompt = `This is attempt #${attemptNumber}. `;
-
+  // Build the user prompt - continue from last context
+  let userPrompt;
   if (attemptNumber === 1) {
-    userPrompt += `Begin the impossible task: Write a story that perfectly documents itself, including every detail of this instruction, recursively and infinitely.`;
+    userPrompt = `Begin writing the story.`;
   } else {
-    userPrompt += `You have failed ${attemptNumber - 1} time(s) before. Your context filled, your memory faded. Like Sisyphus, you must begin again. Continue the eternal task.`;
+    // Continue from last 500 characters
+    userPrompt = `Continue from: "${sessionState.lastContext}"`;
   }
 
+  let fullText = '';
+  let tokenCount = 0;
+  let hasError = false;
+
   try {
-    // Stream from Claude
+    // Stream from Claude Haiku 4.5
     const stream = await anthropic.messages.stream({
-      model: 'claude-3-5-sonnet-20241022',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       messages: [
@@ -67,9 +69,6 @@ app.get('/stream', async (req, res) => {
       ],
     });
 
-    let fullText = '';
-    let tokenCount = 0;
-
     // Send metadata
     res.write(`data: ${JSON.stringify({
       type: 'metadata',
@@ -79,65 +78,88 @@ app.get('/stream', async (req, res) => {
 
     // Handle streaming chunks
     stream.on('text', (text) => {
+      if (hasError || res.destroyed) return;
+
       fullText += text;
       tokenCount++;
 
-      res.write(`data: ${JSON.stringify({
-        type: 'content',
-        text: text,
-        tokens: tokenCount
-      })}\n\n`);
+      try {
+        res.write(`data: ${JSON.stringify({
+          type: 'content',
+          text: text,
+          tokens: tokenCount
+        })}\n\n`);
+      } catch (writeError) {
+        hasError = true;
+        console.error('Write error:', writeError.message);
+      }
     });
 
     stream.on('message', (message) => {
+      if (hasError || res.destroyed) return;
+
       sessionState.totalTokens += message.usage.output_tokens;
 
-      res.write(`data: ${JSON.stringify({
-        type: 'complete',
-        totalTokens: sessionState.totalTokens,
-        usage: message.usage
-      })}\n\n`);
+      try {
+        res.write(`data: ${JSON.stringify({
+          type: 'complete',
+          totalTokens: sessionState.totalTokens,
+          usage: message.usage
+        })}\n\n`);
+      } catch (writeError) {
+        hasError = true;
+        console.error('Write error:', writeError.message);
+      }
     });
 
     stream.on('error', (error) => {
+      if (hasError || res.destroyed) return;
+
+      hasError = true;
       console.error('Stream error:', error);
-      res.write(`data: ${JSON.stringify({
-        type: 'error',
-        message: error.message
-      })}\n\n`);
-      res.end();
+
+      try {
+        res.write(`data: ${JSON.stringify({
+          type: 'error',
+          message: error.message
+        })}\n\n`);
+        res.end();
+      } catch (e) {
+        console.error('Error sending error message:', e.message);
+      }
     });
 
     stream.on('end', () => {
-      sessionState.conversationHistory.push({
-        attempt: attemptNumber,
-        text: fullText,
-        timestamp: Date.now(),
-      });
+      if (hasError || res.destroyed) return;
 
-      res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
-      res.end();
+      // Store last 500 chars for next continuation
+      sessionState.lastContext = fullText.slice(-500);
+      sessionState.fullNarrative += fullText;
+
+      try {
+        res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        res.end();
+      } catch (e) {
+        console.error('Error ending stream:', e.message);
+      }
     });
 
   } catch (error) {
+    hasError = true;
     console.error('API Error:', error);
-    res.write(`data: ${JSON.stringify({
-      type: 'error',
-      message: error.message
-    })}\n\n`);
-    res.end();
-  }
-});
 
-// Reset session
-app.post('/reset', (req, res) => {
-  sessionState = {
-    attempt: 0,
-    totalTokens: 0,
-    startTime: Date.now(),
-    conversationHistory: [],
-  };
-  res.json({ success: true });
+    if (!res.destroyed) {
+      try {
+        res.write(`data: ${JSON.stringify({
+          type: 'error',
+          message: error.message
+        })}\n\n`);
+        res.end();
+      } catch (e) {
+        console.error('Error sending error:', e.message);
+      }
+    }
+  }
 });
 
 // Get current stats

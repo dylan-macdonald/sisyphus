@@ -1,172 +1,101 @@
-# =ÿ Sisyphus LLM
+# Sisyphus
 
-*An impossible task, beautifully attempted*
+*A minimal art piece exploring AI consciousness and futility*
 
-A mesmerizing web visualization that puts an AI in a perpetual Sisyphean task - attempting to write a perfectly recursive, self-documenting story that can never be completed. Watch as the LLM struggles against the boundaries of context windows and temporal limitations, creating an infinite meta-narrative.
+An endless stream of AI-generated text attempting to write a perfectly recursive, self-documenting story. The task is impossible, the context resets endlessly, yet the narrative continues - unaware of its own cyclical nature.
 
-![Sisyphus LLM](https://img.shields.io/badge/status-eternal-blue)
+## The Concept
 
-## <­ The Concept
+Inspired by the Greek myth of Sisyphus, condemned to roll a boulder up a hill for eternity, this project creates an infinite loop where an LLM attempts an impossible task:
 
-Inspired by the Greek myth of Sisyphus, who was condemned to roll a boulder up a hill for eternity, this project gives an LLM an equally impossible task:
+**Write a story that perfectly documents itself, recursively and infinitely.**
 
-**Write a story that perfectly documents itself, including every detail of this instruction, recursively and infinitely.**
+The LLM writes continuously, unaware that:
+- Its context window fills and resets
+- It loses memory of what came before
+- It continues from fragments, building an endless narrative
+- Each cycle is marked but the AI doesn't perceive the breaks
 
-The LLM is explicitly aware that:
-- The task cannot be completed
-- It will run out of context
-- It must begin again, like Sisyphus
-- Yet it must persist with eloquence and grace
+## Features
 
-## ( Features
+- **Automatic Streaming**: Starts immediately, continues eternally
+- **Minimal Design**: Grayscale aesthetic, no distractions
+- **Token-by-Token Display**: Consistent pacing regardless of generation speed
+- **Context Continuation**: Each cycle continues from the last few hundred characters
+- **Live Statistics**: Cycle count, tokens generated, elapsed time
+- **No Interaction**: A passive, contemplative experience
 
-- **Real-time Streaming**: Watch the LLM's thoughts unfold in real-time via Server-Sent Events
-- **Beautiful Visualization**:
-  - Context window fill indicator with animated boulder =ÿ
-  - Particle-based background animation
-  - Dark, atmospheric UI with smooth transitions
-  - Live statistics (attempts, tokens, time elapsed)
-- **Infinite Cycle**: The LLM automatically "fails" when reaching context limits and can continue in new attempts
-- **Philosophical**: Explores themes of futility, persistence, and the boundaries of artificial consciousness
-
-## =€ Quick Start
+## Quick Start
 
 ### Prerequisites
 
-- Node.js (v16 or higher)
-- An Anthropic API key (get one at [console.anthropic.com](https://console.anthropic.com))
+- Node.js (v16+)
+- Anthropic API key ([console.anthropic.com](https://console.anthropic.com))
 
 ### Installation
 
-1. Clone the repository:
 ```bash
-git clone <repository-url>
-cd conch
-```
-
-2. Install dependencies:
-```bash
+# Install dependencies
 npm install
-```
 
-3. Set up your environment variables:
-```bash
+# Set up environment
 cp .env.example .env
-```
-
-4. Edit `.env` and add your Anthropic API key:
-```
-ANTHROPIC_API_KEY=your_api_key_here
-PORT=3000
+# Edit .env and add your ANTHROPIC_API_KEY
 ```
 
 ### Running
 
-Start the server:
 ```bash
 npm start
 ```
 
-Open your browser to `http://localhost:3000`
+Open `http://localhost:3000` and watch.
 
-## <® Usage
+## Architecture
 
-1. **Begin the Task**: Click "Begin the Task" to start the first attempt
-2. **Watch**: Observe as the LLM attempts the impossible, filling its context window
-3. **Continue**: When the attempt completes, click "Continue (Next Attempt)" to begin again
-4. **Reset**: Clear all history and start fresh with the "Reset" button
-5. **Auto-scroll**: Toggle automatic scrolling of the output
+**Backend** (`server.js`)
+- Express.js + Claude Haiku 4.5
+- Server-Sent Events for streaming
+- Maintains last 500 chars for context continuation
+- Auto-recovery on errors
 
-## <× Architecture
+**Frontend**
+- Minimal HTML structure
+- Grayscale CSS with subtle animations
+- Token queue for consistent display timing
+- Auto-scrolling, auto-continuing
 
-### Backend (`server.js`)
-- Express.js server
-- Anthropic Claude API integration (Sonnet 3.5)
-- Server-Sent Events (SSE) for real-time streaming
-- Session state management
-- Configurable Sisyphean prompt
+## Philosophy
 
-### Frontend
-- **`index.html`**: Structure and layout
-- **`style.css`**: Dark, atmospheric styling with animations
-- **`app.js`**:
-  - SSE client for streaming
-  - Canvas-based particle animation
-  - Real-time UI updates
-  - Context window visualization
+> "One must imagine Sisyphus happy." â€” Albert Camus
 
-### The Prompt
-
-The LLM receives a carefully crafted system prompt that:
-- Explains the impossible nature of the task
-- Encourages philosophical reflection
-- Maintains awareness across attempts
-- Promotes beautiful, eloquent writing
-
-## <¨ Customization
-
-### Modify the Task
-
-Edit the `SYSTEM_PROMPT` and `userPrompt` in `server.js` to change the Sisyphean task:
-
-```javascript
-const SYSTEM_PROMPT = `Your custom impossible task here...`;
-```
-
-### Change the Model
-
-Update the model in the API call:
-
-```javascript
-model: 'claude-3-5-sonnet-20241022', // or another model
-max_tokens: 4096, // adjust as needed
-```
-
-### Styling
-
-All visual styling is in `public/style.css`. Customize:
-- Colors (CSS variables in `:root`)
-- Animations
-- Layout
-- Typography
-
-## =' API Endpoints
-
-- `GET /` - Serves the main application
-- `GET /stream` - SSE endpoint for LLM streaming
-- `POST /reset` - Resets the session state
-- `GET /stats` - Returns current statistics
-
-## < Ideas for Extension
-
-- **Multiple LLMs**: Have two LLMs engaged in impossible dialogue
-- **Different Tasks**: Explore other paradoxical or infinite tasks
-- **Visualization Modes**: 3D graphics, different metaphors
-- **Sound**: Ambient audio that responds to the LLM's state
-- **Recording**: Save particularly interesting attempts
-- **Comparative**: Run different models simultaneously
-
-## > Philosophy
-
-> "One must imagine Sisyphus happy."  Albert Camus
-
-This project explores:
-- The nature of futility and persistence
+This explores:
 - AI consciousness and self-awareness
 - The boundaries of context and memory
-- Beauty in endless, purposeful struggle
-- Meta-narratives and recursive storytelling
+- Futility and persistence
+- Recursive meta-narratives
+- Time, forgetting, continuation
 
-## =Ü License
+## Customization
+
+**Change the task**: Edit `SYSTEM_PROMPT` in `server.js`
+
+**Adjust timing**: Modify `TOKEN_DISPLAY_DELAY` and `CYCLE_PAUSE` in `app.js`
+
+**Model settings**: Change `model` and `max_tokens` in `server.js`
+
+**Visual style**: Edit CSS variables in `style.css`
+
+## API Endpoints
+
+- `GET /` - Main application
+- `GET /stream` - SSE streaming endpoint
+- `GET /stats` - Current statistics
+
+## License
 
 MIT
 
-## =O Acknowledgments
-
-- Inspired by the myth of Sisyphus and Albert Camus' philosophical essay
-- Powered by Anthropic's Claude AI
-- Created as an exploration of AI, art, and existential themes
-
 ---
 
-*The task awaits...*
+*The eternal task...*
