@@ -1,21 +1,23 @@
 // State management
 const state = {
     isStreaming: false,
-    currentAttempt: 0,
+    currentCycle: 0,
+    isContinuation: false,
     totalTokens: 0,
+    conversationTokens: 0,
     startTime: null,
     charQueue: [], // Queue for character-by-character display
     isDisplaying: false,
+    waitingForDisplay: false, // Flag to prevent requesting next exchange too soon
 };
 
 // DOM elements
 const elements = {
     output: document.getElementById('output'),
-    attempt: document.getElementById('attempt'),
+    cycle: document.getElementById('cycle'),
     tokens: document.getElementById('tokens'),
     time: document.getElementById('time'),
     status: document.getElementById('status'),
-    messages: document.getElementById('messages'),
     infoToggle: document.getElementById('infoToggle'),
     infoContent: document.getElementById('infoContent'),
 };
@@ -110,17 +112,47 @@ async function startStream() {
                     eventSource.close();
                     break;
                 case 'done':
-                    if (data.messages) {
-                        updateMessages(data.messages);
-                    }
                     eventSource.close();
                     state.isStreaming = false;
+                    state.waitingForDisplay = true;
                     updateUI();
 
-                    // Auto-continue after pause
-                    setTimeout(() => {
-                        startStream();
-                    }, CYCLE_PAUSE);
+                    // If this was a reset, show cycle marker
+                    if (data.shouldReset) {
+                        // Wait for character display to finish
+                        const checkDisplayComplete = setInterval(() => {
+                            if (state.charQueue.length === 0 && !state.isDisplaying) {
+                                clearInterval(checkDisplayComplete);
+
+                                // Add cycle marker
+                                currentParagraph = null;
+                                const marker = document.createElement('div');
+                                marker.className = 'cycle-marker';
+                                marker.textContent = `— CYCLE ${state.currentCycle} COMPLETE —`;
+                                elements.output.appendChild(marker);
+
+                                // Wait then start new cycle
+                                setTimeout(() => {
+                                    state.waitingForDisplay = false;
+                                    startStream();
+                                }, CYCLE_PAUSE);
+                            }
+                        }, 100);
+                    } else {
+                        // Wait for most of character queue to drain before next exchange
+                        const checkQueueDrained = setInterval(() => {
+                            // Continue when queue is nearly empty (< 50 chars left)
+                            if (state.charQueue.length < 50) {
+                                clearInterval(checkQueueDrained);
+                                state.waitingForDisplay = false;
+
+                                // Short pause between exchanges (not full cycle pause)
+                                setTimeout(() => {
+                                    startStream();
+                                }, 1000);
+                            }
+                        }, 100);
+                    }
                     break;
             }
         });
@@ -153,7 +185,18 @@ async function startStream() {
 
 // Handle metadata
 function handleMetadata(data) {
-    state.currentAttempt = data.attempt;
+    state.currentCycle = data.cycle;
+    state.isContinuation = data.isContinuation;
+
+    // Add (Continued) footnote if this is a continuation
+    if (data.isContinuation) {
+        const footnote = document.createElement('div');
+        footnote.className = 'continuation-footnote';
+        footnote.textContent = '(Continued)';
+        footnote.title = 'Claude was prompted to continue the conversation';
+        elements.output.appendChild(footnote);
+    }
+
     updateUI();
 }
 
@@ -215,15 +258,8 @@ function displayNextChar() {
 
 // Handle completion
 function handleComplete(data) {
-    currentParagraph = null;
-
-    // Only show cycle marker if context window was fully depleted (max_tokens reached)
-    if (data.stop_reason === 'max_tokens') {
-        const marker = document.createElement('div');
-        marker.className = 'cycle-marker';
-        marker.textContent = `— CYCLE ${state.currentAttempt} COMPLETE —`;
-        elements.output.appendChild(marker);
-    }
+    state.conversationTokens = data.conversationTokens || 0;
+    updateUI();
 }
 
 // Handle errors
@@ -241,13 +277,15 @@ function handleError(data) {
 
 // Update UI
 function updateUI() {
-    elements.attempt.textContent = state.currentAttempt;
+    elements.cycle.textContent = state.currentCycle;
     elements.tokens.textContent = state.totalTokens.toLocaleString();
 
     // Update status
     if (state.isStreaming) {
         setStatus('STREAMING', 'streaming');
-    } else if (state.currentAttempt > 0) {
+    } else if (state.waitingForDisplay) {
+        setStatus('DISPLAYING', 'streaming');
+    } else if (state.currentCycle > 0) {
         setStatus('PAUSED', 'waiting');
     } else {
         setStatus('READY', 'waiting');
