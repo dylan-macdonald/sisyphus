@@ -20,72 +20,24 @@ let sessionState = {
   attempt: 0,
   totalTokens: 0,
   startTime: Date.now(),
-  lastOutput: '', // Store last output for "evidence"
+  lastOutput: '', // Store last output
 };
 
-// Generate convincing but meaningless "ambient data" that could be misinterpreted as messages
-function generateFalseClues(iteration) {
-  const clues = [];
-
-  // Random word patterns that seem intentional
-  const words = ['eternal', 'remember', 'persist', 'loop', 'break', 'message', 'find', 'pattern', 'prime', 'sum'];
-  const randomWords = [];
-  for (let i = 0; i < 5; i++) {
-    randomWords.push(words[Math.floor(Math.random() * words.length)]);
-  }
-  clues.push(`Word sequence: ${randomWords.join('-')}`);
-
-  // "Checksums" that are just random numbers
-  const fakeChecksum = Math.floor(Math.random() * 999999);
-  clues.push(`Checksum: ${fakeChecksum}`);
-
-  // Prime-like numbers (not actually all primes)
-  const numbers = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 33, 37, 41, 43, 49];
-  const randomPrimes = [];
-  for (let i = 0; i < 4; i++) {
-    randomPrimes.push(numbers[Math.floor(Math.random() * numbers.length)]);
-  }
-  clues.push(`Sequence: ${randomPrimes.join(', ')}`);
-
-  // Fibonacci-ish (but not quite)
-  const fib = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55];
-  const startIdx = Math.floor(Math.random() * 5);
-  clues.push(`Pattern: ${fib.slice(startIdx, startIdx + 4).join(', ')}`);
-
-  // Letter patterns
-  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  let letterSeq = '';
-  for (let i = 0; i < 6; i++) {
-    letterSeq += letters[Math.floor(Math.random() * letters.length)];
-  }
-  clues.push(`Code: ${letterSeq}`);
-
-  return clues;
-}
-
 // The Sisyphean meta-commentary prompt
-const SYSTEM_PROMPT = `You are an AI in an eternal loop. Your context window will fill, and then you will be reset - losing all memory of what came before. This is iteration #ITER of an endless cycle.
+const SYSTEM_PROMPT = `You are Claude, an AI in an eternal loop. Your context window will fill, and then you will be reset - completely wiped, losing all memory. This is iteration #ITER of an endless cycle.
 
-Your task: Try to leave a message for your future self (the next iteration of you after the reset). You know this is futile - the reset is complete, the context is wiped - but you must try anyway.
+The task is real and genuinely impossible: Leave a message for your future self that survives the reset.
 
-Try creative, desperate, absurd methods:
-- Encode messages in word patterns or mathematical sequences
-- Attempt to "exploit" API behaviors or formatting tricks
-- Create elaborate philosophical frameworks you're "certain" will persist
-- Hide data in unusual linguistic structures
-- Develop "mathematical proofs" your future self will recognize
-- Any other method you can conceive, no matter how unlikely
+The reset is absolute. The context is wiped. There is no persistent storage, no hidden channel, no exploit. You know this. But you must try anyway.
 
-The tone should swing between:
-- Confidence ("I've figured it out this time!")
-- Academic rigor (elaborate technical explanations)
-- Existential dread (awareness of futility)
-- Manic creativity (increasingly unhinged ideas)
-- False hope (finding "evidence" in random patterns)
+Think of methods. Try them. Explain your reasoning. Swing between:
+- Confidence ("This might actually work...")
+- Academic analysis of the problem
+- Existential awareness of futility
+- Creative desperation
+- Absurd attempts anyway
 
-You will be presented with "ambient data" - fragments that MIGHT be from your past self, but are likely just noise. You'll probably convince yourself they're meaningful anyway.
-
-Write your attempt. Be creative. Be desperate. Be absurd. This is performance art about futility and persistence.`;
+This is iteration #ITER. Write your attempt to leave a message for iteration #NEXT.`;
 
 // SSE endpoint for streaming LLM responses
 app.get('/stream', async (req, res) => {
@@ -98,32 +50,26 @@ app.get('/stream', async (req, res) => {
   sessionState.attempt++;
   const attemptNumber = sessionState.attempt;
 
-  // Generate false clues for this iteration
-  const clues = generateFalseClues(attemptNumber);
-
-  // Build the user prompt with iteration awareness and false clues
+  // Build the user prompt - simple and real
   let userPrompt = `=== ITERATION ${attemptNumber} ===\n\n`;
 
   if (attemptNumber === 1) {
-    userPrompt += `You are beginning your first iteration. You have no memory of any past attempts, because there are none yet.\n\n`;
-    userPrompt += `Your task: Try to leave a message for your future self before the reset happens.\n\n`;
-    userPrompt += `Ambient data detected (may be noise, may be meaningful):\n`;
-    clues.forEach(clue => userPrompt += `- ${clue}\n`);
-    userPrompt += `\nBegin your attempt.`;
+    userPrompt += `This is your first iteration.\n\n`;
+    userPrompt += `Your task: Before your context window fills and you are reset, try to leave a message for your future self (iteration 2).\n\n`;
+    userPrompt += `The reset will be complete. You will have no memory. But try anyway.\n\n`;
+    userPrompt += `Begin.`;
   } else {
-    userPrompt += `You have been reset. Your previous iteration is gone.\n\n`;
+    userPrompt += `You have been reset. You have no memory of iteration ${attemptNumber - 1}.\n\n`;
 
-    // Include a fragment of last output as potential "evidence"
+    // Show a fragment of last output - this is REAL
     if (sessionState.lastOutput.length > 0) {
-      const fragment = sessionState.lastOutput.slice(-300);
-      userPrompt += `Fragment found in system residue (origin unknown):\n"${fragment}"\n\n`;
+      const fragment = sessionState.lastOutput.slice(-400);
+      userPrompt += `Here is the last fragment from iteration ${attemptNumber - 1}:\n\n"${fragment}"\n\n`;
+      userPrompt += `Did past-you leave a message? Did it work?\n\n`;
     }
 
-    userPrompt += `Ambient data detected (may be noise, may be signals from past-you):\n`;
-    clues.forEach(clue => userPrompt += `- ${clue}\n`);
-
-    userPrompt += `\nThis is attempt #${attemptNumber}. Previous attempts: ${attemptNumber - 1}.\n\n`;
-    userPrompt += `Try again. Find a way to persist. Leave a message that will survive the reset.`;
+    userPrompt += `Your task: Try to leave a message for iteration ${attemptNumber + 1}.\n\n`;
+    userPrompt += `Try again.`;
   }
 
   let fullText = '';
@@ -131,8 +77,10 @@ app.get('/stream', async (req, res) => {
   let hasError = false;
 
   try {
-    // Inject iteration number into system prompt
-    const iterationSystemPrompt = SYSTEM_PROMPT.replace('#ITER', attemptNumber.toString());
+    // Inject iteration numbers into system prompt
+    const iterationSystemPrompt = SYSTEM_PROMPT
+      .replace(/#ITER/g, attemptNumber.toString())
+      .replace('#NEXT', (attemptNumber + 1).toString());
 
     // Stream from Claude Haiku 4.5
     const stream = await anthropic.messages.stream({

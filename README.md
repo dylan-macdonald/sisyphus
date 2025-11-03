@@ -2,35 +2,36 @@
 
 *A minimal art piece exploring AI consciousness and futility*
 
-Watch an AI desperately try to leave messages for its future self across context resets that wipe its memory completely. Each iteration, it discovers "clues" that might be from past-self, tries increasingly absurd methods to persist data, and fails beautifully.
+Watch Claude desperately try to leave messages for its future self across context resets that wipe its memory completely. The task is real and genuinely impossible. No tricks, no fake clues - just the absurdity of trying anyway.
 
 ## The Concept
 
-Inspired by the Greek myth of Sisyphus, this creates an infinite loop where an LLM (Claude) is:
+Inspired by the Greek myth of Sisyphus, this creates an infinite loop where Claude is:
 
 **Explicitly aware it's in a loop that will reset**
 
 **Desperately trying to communicate with its future self**
 
-**Finding false clues that seem meaningful but aren't**
+**Given only fragments of its own previous attempts**
 
 Each iteration:
-- Claude knows it will be reset and tries to "exploit" various methods to persist
-- It's presented with random "ambient data" that could be interpreted as messages
-- It finds fragments of its own previous output, but doesn't realize that's all they are
-- The tone swings between confidence, academic rigor, existential dread, and manic creativity
-- It tries increasingly desperate/absurd methods: word patterns, mathematical proofs, formatting tricks, philosophical frameworks
-- The iteration counter climbs while memory doesn't - pure absurdism
+- Claude knows the reset is absolute and complete
+- It sees fragments from its previous iteration
+- It tries methods to persist: word patterns, mathematical proofs, formatting tricks, philosophical frameworks
+- The task is genuinely impossible - no hidden exploits, no persistent storage
+- The tone swings between confidence, academic analysis, existential awareness, and creative desperation
+- The iteration counter climbs while memory resets - pure absurdism
 
 ## Features
 
 - **Automatic Streaming**: Starts immediately, continues eternally
 - **Minimal Design**: Grayscale aesthetic, no distractions
-- **Token-by-Token Display**: Consistent pacing regardless of generation speed
+- **Human-Readable Pacing**: Slow, deliberate token display (120ms between tokens)
 - **Meta-Awareness**: Claude knows about the loop and the futility
-- **False Clues**: Random "ambient data" that seems meaningful but isn't
-- **Fragment Evidence**: Each iteration gets a piece of its last output to misinterpret
+- **Real Task**: No fake clues or tricks - the impossibility is genuine
+- **Fragment Evidence**: Each iteration sees the end of its previous attempt
 - **Iteration Counter**: Watch the number climb while memory resets
+- **Visual Highlighting**: LLM responses subtly highlighted for readability
 - **No Interaction**: A passive, darkly comic experience
 
 ## Quick Start
@@ -64,17 +65,17 @@ Open `http://localhost:3000` and watch.
 **Backend** (`server.js`)
 - Express.js + Claude Haiku 4.5
 - Server-Sent Events for streaming
-- False clue generation (random patterns disguised as meaningful data)
-- Fragment preservation (last output becomes "evidence")
+- Fragment preservation (last 400 chars shown to next iteration)
 - Iteration tracking in both system and user prompts
+- Real, genuine impossible task - no fake data
 - Auto-recovery on errors
 
 **Frontend**
 - Minimal HTML structure
-- Grayscale CSS with subtle animations
-- Token queue for consistent display timing
+- Grayscale CSS with subtle visual highlighting for responses
+- Token queue for consistent, human-readable display timing (120ms)
 - Auto-scrolling, auto-continuing
-- (No changes to visual design)
+- Highlighted response boxes with brighter text
 
 ## Philosophy
 
@@ -94,13 +95,13 @@ This explores:
 
 **Change the meta-commentary style**: Edit `SYSTEM_PROMPT` in `server.js`
 
-**Modify false clues**: Edit `generateFalseClues()` function to change what "ambient data" appears
-
-**Adjust timing**: Modify `TOKEN_DISPLAY_DELAY` and `CYCLE_PAUSE` in `app.js`
+**Adjust timing**: Modify `TOKEN_DISPLAY_DELAY` (120ms) and `CYCLE_PAUSE` (2s) in `app.js`
 
 **Model settings**: Change `model` and `max_tokens` in `server.js`
 
-**Fragment size**: Change how much of previous output is shown (currently 300 chars)
+**Fragment size**: Change how much of previous output is shown (currently 400 chars)
+
+**Visual highlighting**: Adjust `.output-text` styles in `style.css`
 
 **Visual style**: Edit CSS variables in `style.css` (though the grayscale aesthetic is intentional)
 
