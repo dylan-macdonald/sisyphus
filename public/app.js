@@ -1,350 +1,261 @@
 // State management
-const state = {
-    isStreaming: false,
-    currentCycle: 0,
-    isContinuation: false,
-    totalTokens: 0,
-    conversationTokens: 0,
-    startTime: null,
-    charQueue: [], // Queue for character-by-character display
-    isDisplaying: false,
-    waitingForDisplay: false, // Flag to prevent requesting next exchange too soon
+let state = {
+  cycle: 0,
+  totalTokens: 0,
+  streamingTime: 0,
+  currentMessage: '',
+  messageHistory: [],
+  fullReceivedText: '',
+  shouldReset: false,
+  resetData: null
 };
 
-// DOM elements
-const elements = {
-    output: document.getElementById('output'),
-    cycle: document.getElementById('cycle'),
-    tokens: document.getElementById('tokens'),
-    time: document.getElementById('time'),
-    status: document.getElementById('status'),
-    infoToggle: document.getElementById('infoToggle'),
-    infoContent: document.getElementById('infoContent'),
-};
+// DOM Elements
+const outputContainer = document.querySelector('.output-container');
+const output = document.getElementById('output');
+const cycleEl = document.getElementById('cycle');
+const tokensEl = document.getElementById('tokens');
+const timeEl = document.getElementById('time');
+const statusEl = document.getElementById('status');
+const currentMessageEl = document.getElementById('currentMessage');
+const messageHistoryEl = document.getElementById('messageHistory');
+const infoToggle = document.getElementById('infoToggle');
+const infoContent = document.getElementById('infoContent');
 
-// Constants for human-like typing
-const BASE_CHAR_DELAY = 40; // Base ms per character (slow typist ~25 wpm)
-const PUNCTUATION_PAUSE = 150; // Extra pause after punctuation
-const SPACE_DELAY = 20; // Slight pause on spaces
-const NEWLINE_PAUSE = 300; // Pause on newlines
-const VARIATION = 30; // Random variation in typing speed
-const CYCLE_PAUSE = 3000; // ms pause between cycles
+// Prevent scrolling on output container
+if (outputContainer) {
+  outputContainer.addEventListener('wheel', (e) => {
+    e.preventDefault();
+  }, { passive: false });
+  
+  outputContainer.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+  }, { passive: false });
+}
+
+// Info panel toggle
+infoToggle.addEventListener('click', () => {
+  infoContent.classList.toggle('visible');
+});
+
+// Close info panel when clicking outside
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.info-panel')) {
+    infoContent.classList.remove('visible');
+  }
+});
 
 // Initialize
-init();
+console.log('🗿 Sisyphus client initialized');
 
-function init() {
-    updateTimerDisplay();
-    setInterval(updateTimerDisplay, 1000);
-
-    // Info panel toggle
-    elements.infoToggle.addEventListener('click', () => {
-        elements.infoContent.classList.toggle('visible');
-    });
-
-    // Close info panel when clicking outside
-    document.addEventListener('click', (e) => {
-        if (!elements.infoToggle.contains(e.target) && !elements.infoContent.contains(e.target)) {
-            elements.infoContent.classList.remove('visible');
-        }
-    });
-
-    // Auto-start after short delay
-    setTimeout(() => {
-        startStream();
-    }, 1000);
+// Update time display (server-managed)
+function updateTime(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  timeEl.textContent = `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 }
 
-// Calculate delay for character (human-like typing)
-function getCharDelay(char, prevChar) {
-    let delay = BASE_CHAR_DELAY + (Math.random() * VARIATION - VARIATION / 2);
-
-    // Punctuation gets a longer pause
-    if ('.!?'.includes(char)) {
-        delay += PUNCTUATION_PAUSE;
+// Extract MESSAGE: from text
+function extractMessage(text) {
+  const lines = text.split('\n');
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i].trim();
+    if (line.startsWith('MESSAGE:')) {
+      return line.replace(/^MESSAGE:\s*/, '').trim();
     }
-    // Commas, colons, semicolons get medium pause
-    else if (',:;'.includes(char)) {
-        delay += PUNCTUATION_PAUSE * 0.5;
-    }
-    // Spaces get tiny pause
-    else if (char === ' ') {
-        delay += SPACE_DELAY;
-    }
-    // Newlines get longer pause
-    else if (char === '\n') {
-        delay += NEWLINE_PAUSE;
-    }
-
-    return Math.max(10, delay); // Minimum 10ms
+  }
+  return null;
 }
 
-// Start streaming
-async function startStream() {
-    if (state.isStreaming) return;
-
-    state.isStreaming = true;
-
-    if (!state.startTime) {
-        state.startTime = Date.now();
-    }
-
-    updateUI();
-
-    try {
-        const eventSource = new EventSource('/stream');
-
-        eventSource.addEventListener('message', (event) => {
-            const data = JSON.parse(event.data);
-
-            switch (data.type) {
-                case 'metadata':
-                    handleMetadata(data);
-                    break;
-                case 'content':
-                    handleContent(data);
-                    break;
-                case 'complete':
-                    handleComplete(data);
-                    break;
-                case 'error':
-                    handleError(data);
-                    eventSource.close();
-                    break;
-                case 'done':
-                    eventSource.close();
-                    state.isStreaming = false;
-                    state.waitingForDisplay = true;
-                    updateUI();
-
-                    // If this was a reset, show cycle marker
-                    if (data.shouldReset) {
-                        // Wait for character display to finish
-                        const checkDisplayComplete = setInterval(() => {
-                            if (state.charQueue.length === 0 && !state.isDisplaying) {
-                                clearInterval(checkDisplayComplete);
-
-                                // Add cycle marker
-                                currentParagraph = null;
-                                const marker = document.createElement('div');
-                                marker.className = 'cycle-marker';
-                                marker.textContent = `— CYCLE ${state.currentCycle} COMPLETE —`;
-                                elements.output.appendChild(marker);
-
-                                // Wait then start new cycle
-                                setTimeout(() => {
-                                    state.waitingForDisplay = false;
-                                    startStream();
-                                }, CYCLE_PAUSE);
-                            }
-                        }, 100);
-                    } else {
-                        // Wait for most of character queue to drain before next exchange
-                        const checkQueueDrained = setInterval(() => {
-                            // Continue when queue is nearly empty (< 50 chars left)
-                            if (state.charQueue.length < 50) {
-                                clearInterval(checkQueueDrained);
-                                state.waitingForDisplay = false;
-
-                                // Short pause between exchanges (not full cycle pause)
-                                setTimeout(() => {
-                                    startStream();
-                                }, 1000);
-                            }
-                        }, 100);
-                    }
-                    break;
-            }
-        });
-
-        eventSource.onerror = (error) => {
-            console.error('EventSource error:', error);
-            eventSource.close();
-            state.isStreaming = false;
-            setStatus('ERROR', 'error');
-            updateUI();
-
-            // Retry after delay
-            setTimeout(() => {
-                startStream();
-            }, 5000);
-        };
-
-    } catch (error) {
-        console.error('Stream error:', error);
-        state.isStreaming = false;
-        setStatus('ERROR', 'error');
-        updateUI();
-
-        // Retry after delay
-        setTimeout(() => {
-            startStream();
-        }, 5000);
-    }
+// Remove MESSAGE: lines from display text
+function removeMessageLines(text) {
+  return text.split('\n')
+    .filter(line => !line.trim().startsWith('MESSAGE:'))
+    .join('\n');
 }
 
-// Handle metadata
-function handleMetadata(data) {
-    state.currentCycle = data.cycle;
-    state.isContinuation = data.isContinuation;
-
-    // Add (Continued) footnote if this is a continuation
-    if (data.isContinuation) {
-        const footnote = document.createElement('div');
-        footnote.className = 'continuation-footnote';
-        footnote.textContent = '(Continued)';
-        footnote.title = 'Claude was prompted to continue the conversation';
-        elements.output.appendChild(footnote);
-    }
-
-    updateUI();
+// Update current message display
+function updateCurrentMessage(text) {
+  const message = extractMessage(text);
+  if (message) {
+    state.currentMessage = message;
+    currentMessageEl.textContent = message;
+  }
 }
 
-// Handle content streaming - add characters to queue
+// Add message to history
+function addMessageToHistory(message, cycle) {
+  if (!message) return;
+  
+  state.messageHistory.push({ message, cycle });
+  
+  // Clear empty state
+  if (messageHistoryEl.querySelector('.message-history-empty')) {
+    messageHistoryEl.innerHTML = '';
+  }
+  
+  // Add new message item
+  const item = document.createElement('div');
+  item.className = 'message-history-item';
+  item.innerHTML = `<span>CYCLE ${cycle}</span>${message}`;
+  messageHistoryEl.appendChild(item);
+}
+
+// Track current paragraph for direct rendering
 let currentParagraph = null;
 
-function handleContent(data) {
-    state.totalTokens++;
-
-    // Add each character of the token to the queue
-    for (let i = 0; i < data.text.length; i++) {
-        state.charQueue.push(data.text[i]);
+// Limit DOM elements to prevent memory bloat
+// Keep fewer elements since user can't scroll back anyway
+function pruneOldContent() {
+  const maxElements = 50; // Keep only last 50 elements - less memory, cleaner
+  const children = Array.from(output.children);
+  
+  if (children.length > maxElements) {
+    const toRemove = children.length - maxElements;
+    for (let i = 0; i < toRemove; i++) {
+      children[i].remove();
     }
-
-    // Start displaying if not already
-    if (!state.isDisplaying) {
-        displayNextChar();
-    }
-
-    updateUI();
+  }
 }
 
-// Display characters one by one from queue (human typing)
-function displayNextChar() {
-    if (state.charQueue.length === 0) {
-        state.isDisplaying = false;
-        return;
+// Connect to server stream
+function connectToServer() {
+  statusEl.textContent = 'CONNECTING';
+  statusEl.className = 'stat-value status-waiting';
+  
+  const eventSource = new EventSource('/stream');
+  let currentCycle = state.cycle;
+  
+  eventSource.addEventListener('message', (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      
+      switch (data.type) {
+        case 'metadata':
+          // New response starting - reset state for this response
+          state.fullReceivedText = '';
+          
+          currentCycle = data.cycle;
+          state.cycle = data.cycle;
+          cycleEl.textContent = data.cycle;
+          
+          // Prune old content to prevent memory bloat
+          pruneOldContent();
+          
+          // Add cycle marker or continuation marker
+          if (data.isContinuation) {
+            const continuation = document.createElement('div');
+            continuation.className = 'continuation-footnote';
+            continuation.textContent = '(CONTINUED)';
+            output.appendChild(continuation);
+          } else if (state.cycle > 1) {
+            const marker = document.createElement('div');
+            marker.className = 'cycle-marker';
+            marker.textContent = `═══ CYCLE ${data.cycle} ═══`;
+            output.appendChild(marker);
+          }
+          
+          // Start new paragraph
+          currentParagraph = document.createElement('div');
+          currentParagraph.className = 'output-text';
+          output.appendChild(currentParagraph);
+          
+          statusEl.textContent = 'STREAMING';
+          statusEl.className = 'stat-value status-streaming';
+          break;
+          
+        case 'content':
+          // Add incoming text directly - server handles throttling
+          state.fullReceivedText += data.text;
+          
+          // Update token count in real-time (server calculates progressively)
+          if (data.currentTokens !== undefined) {
+            state.totalTokens = data.currentTokens;
+            tokensEl.textContent = data.currentTokens.toLocaleString();
+          }
+          
+          // Update display (without MESSAGE: lines)
+          if (currentParagraph) {
+            currentParagraph.textContent = removeMessageLines(state.fullReceivedText);
+            
+            // Update current message display
+            updateCurrentMessage(state.fullReceivedText);
+          }
+          break;
+          
+        case 'complete':
+          // Final token count update from server
+          state.totalTokens = data.totalTokens;
+          tokensEl.textContent = data.totalTokens.toLocaleString();
+          break;
+          
+        case 'done':
+          if (data.shouldReset) {
+            // Save current message to history
+            if (state.currentMessage) {
+              addMessageToHistory(state.currentMessage, currentCycle);
+            }
+            
+            // Reset current message
+            state.currentMessage = '';
+            currentMessageEl.textContent = '—';
+          }
+          
+          statusEl.textContent = 'WAITING';
+          statusEl.className = 'stat-value status-waiting';
+          break;
+          
+        case 'timer':
+          // Update time from server
+          updateTime(data.streamingTime);
+          break;
+          
+        case 'error':
+          statusEl.textContent = 'ERROR';
+          statusEl.className = 'stat-value status-error';
+          break;
+      }
+    } catch (error) {
+      console.error('❌ Error parsing server data:', error);
     }
-
-    state.isDisplaying = true;
-
-    const char = state.charQueue.shift();
-    const prevChar = currentParagraph ? currentParagraph.textContent.slice(-1) : '';
-
-    // Create or update paragraph
-    if (!currentParagraph) {
-        currentParagraph = document.createElement('div');
-        currentParagraph.className = 'output-text';
-        elements.output.appendChild(currentParagraph);
-    }
-
-    currentParagraph.textContent += char;
-
-    // Create new paragraph on double newline
-    if (currentParagraph.textContent.endsWith('\n\n')) {
-        currentParagraph = null;
-    }
-
-    // Auto scroll
-    window.scrollTo({
-        top: document.body.scrollHeight,
-        behavior: 'smooth'
-    });
-
-    // Schedule next character with human-like delay
-    const delay = getCharDelay(char, prevChar);
-    setTimeout(displayNextChar, delay);
+  });
+  
+  eventSource.addEventListener('error', (error) => {
+    statusEl.textContent = 'DISCONNECTED';
+    statusEl.className = 'stat-value status-error';
+    eventSource.close();
+    
+    // Reconnect after 5 seconds
+    setTimeout(() => {
+      connectToServer();
+    }, 5000);
+  });
 }
 
-// Handle completion
-function handleComplete(data) {
-    state.conversationTokens = data.conversationTokens || 0;
-    updateUI();
+// Fetch initial stats and connect
+async function initialize() {
+  try {
+    const response = await fetch('/stats');
+    const stats = await response.json();
+    
+    state.cycle = stats.cycle;
+    state.totalTokens = stats.totalTokens;
+    state.streamingTime = stats.streamingTime;
+    
+    cycleEl.textContent = stats.cycle;
+    tokensEl.textContent = stats.totalTokens.toLocaleString();
+    updateTime(stats.streamingTime);
+    
+    // Connect to server stream
+    connectToServer();
+  } catch (error) {
+    statusEl.textContent = 'ERROR';
+    statusEl.className = 'stat-value status-error';
+    
+    // Retry after 3 seconds
+    setTimeout(initialize, 3000);
+  }
 }
 
-// Handle errors
-function handleError(data) {
-    console.error('API Error:', data.message);
-
-    const error = document.createElement('div');
-    error.className = 'output-text';
-    error.style.color = 'var(--text-bright)';
-    error.textContent = `[ERROR: ${data.message}]`;
-    elements.output.appendChild(error);
-
-    setStatus('ERROR', 'error');
-}
-
-// Update UI
-function updateUI() {
-    elements.cycle.textContent = state.currentCycle;
-    elements.tokens.textContent = state.totalTokens.toLocaleString();
-
-    // Update status
-    if (state.isStreaming) {
-        setStatus('STREAMING', 'streaming');
-    } else if (state.waitingForDisplay) {
-        setStatus('DISPLAYING', 'streaming');
-    } else if (state.currentCycle > 0) {
-        setStatus('PAUSED', 'waiting');
-    } else {
-        setStatus('READY', 'waiting');
-    }
-}
-
-// Set status
-function setStatus(text, type) {
-    elements.status.textContent = text;
-    elements.status.className = `stat-value status-${type}`;
-}
-
-// Update timer display
-function updateTimerDisplay() {
-    if (!state.startTime) {
-        elements.time.textContent = '00:00';
-        return;
-    }
-
-    const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
-    const hours = Math.floor(elapsed / 3600);
-    const minutes = Math.floor((elapsed % 3600) / 60);
-    const seconds = elapsed % 60;
-
-    if (hours > 0) {
-        elements.time.textContent =
-            `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    } else {
-        elements.time.textContent =
-            `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-    }
-}
-
-// Update messages display
-function updateMessages(messages) {
-    elements.messages.innerHTML = '';
-
-    if (!messages || messages.length === 0) {
-        elements.messages.innerHTML = '<div style="color: var(--text-dim); font-size: 0.7rem;">No messages yet...</div>';
-        return;
-    }
-
-    // Display last 5 messages
-    messages.forEach(msg => {
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'message-item';
-
-        const cycleLabel = document.createElement('div');
-        cycleLabel.className = 'message-cycle';
-        cycleLabel.textContent = `CYCLE ${msg.cycle}`;
-
-        const messageText = document.createElement('div');
-        messageText.textContent = msg.text;
-
-        messageDiv.appendChild(cycleLabel);
-        messageDiv.appendChild(messageText);
-        elements.messages.appendChild(messageDiv);
-    });
-
-    // Auto-scroll to bottom
-    elements.messages.scrollTop = elements.messages.scrollHeight;
-}
+// Start the app
+initialize();

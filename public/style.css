@@ -12,6 +12,8 @@
     --text-bright: #999999;
     --accent: #e8e8e8;
     --border: #2a2a2a;
+    --sidebar-width: min(32vw, 320px);
+    --content-padding: clamp(1.75rem, 4vw, 4rem);
 }
 
 body {
@@ -148,12 +150,12 @@ body {
     top: 0;
     right: 0;
     bottom: 0;
-    width: 280px;
+    width: var(--sidebar-width);
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    gap: 3rem;
-    padding: 3rem 2rem;
+    gap: 2.5rem;
+    padding: clamp(2rem, 4vw, 3.25rem) clamp(1.5rem, 3vw, 2.25rem);
     background: var(--bg-secondary);
     border-left: 1px solid var(--border);
     z-index: 100;
@@ -236,12 +238,45 @@ body {
     margin-bottom: 0.25rem;
 }
 
+/* Output Area Container - No scrolling, only see present */
+.output-container {
+    margin-right: var(--sidebar-width);
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; /* Start from top */
+}
+
+/* Prevent any scrollbar from appearing */
+.output-container::-webkit-scrollbar {
+    display: none;
+}
+
+.output-container {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+}
+
+/* Fade effect at bottom to show content disappearing into time */
+.output-container::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 120px;
+    background: linear-gradient(0deg, var(--bg) 0%, transparent 100%);
+    z-index: 5;
+    pointer-events: none;
+}
+
 /* Output Area */
 .output {
-    margin-right: 280px;
-    padding: 4rem 4rem 4rem 4rem;
-    max-width: 900px;
-    min-height: 100vh;
+    padding: var(--content-padding);
+    max-width: clamp(640px, calc(100vw - var(--sidebar-width) - (var(--content-padding) * 1.5)), 960px);
+    width: 100%;
 }
 
 .output-text {
@@ -255,23 +290,90 @@ body {
 .cycle-marker {
     display: block;
     color: var(--accent);
-    margin: 4rem 0 2rem 0;
-    padding: 1rem 0;
-    border-top: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
+    margin: 6rem 0 4rem 0;
+    padding: 2.5rem 0;
+    border-top: 2px solid var(--accent);
+    border-bottom: 2px solid var(--accent);
     text-align: center;
-    font-size: 0.8rem;
-    letter-spacing: 0.2em;
+    font-size: 1.8rem;
+    font-weight: bold;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    background: linear-gradient(90deg, transparent, var(--bg-secondary), transparent);
+    box-shadow: 0 0 40px rgba(232, 232, 232, 0.1);
 }
 
 .continuation-footnote {
     display: block;
-    color: #333333;
-    margin: 1.5rem 0 0.5rem 0;
-    font-size: 0.75rem;
+    color: var(--accent);
+    margin: 2rem 0 1rem 0;
+    padding: 0.5rem 0;
+    font-size: 0.78rem;
     font-style: italic;
-    opacity: 0.8;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    text-align: center;
+    opacity: 1;
     cursor: help;
+}
+
+.stat-current-message {
+    width: 100%;
+    max-width: 100%;
+    gap: 0.75rem;
+}
+
+.message-current {
+    width: 100%;
+    min-height: 4.5rem;
+    padding: 0.85rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--accent);
+    font-size: 0.78rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.message-history-block {
+    width: 100%;
+    max-width: 100%;
+    gap: 0.75rem;
+}
+
+.message-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: 100%;
+}
+
+.message-history-item {
+    padding: 0.75rem;
+    border-radius: 6px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-bright);
+    font-size: 0.7rem;
+    line-height: 1.5;
+}
+
+.message-history-item span {
+    display: block;
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 0.35rem;
+}
+
+.message-history-empty {
+    color: var(--text-dim);
+    font-size: 0.65rem;
+    padding: 0.75rem;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
 }
 
 /* Status indicators - always show blink */
@@ -295,37 +397,73 @@ body {
     50%, 100% { opacity: 0.3; }
 }
 
-/* Responsive */
+/* Responsive - Mobile Layout */
 @media (max-width: 1024px) {
+    body {
+        display: flex;
+        flex-direction: column;
+    }
+
     .stats-bar {
         position: relative;
         width: 100%;
         height: auto;
         flex-direction: row;
-        justify-content: space-around;
+        flex-wrap: wrap;
+        justify-content: flex-start;
         gap: 1rem;
-        padding: 1.5rem;
+        padding: 1rem;
         border-left: none;
         border-bottom: 1px solid var(--border);
+        order: 1;
+        z-index: 100;
+        background: var(--bg-secondary);
     }
 
     .stat {
-        align-items: center;
+        align-items: flex-start;
+        flex: 0 0 calc(50% - 0.5rem);
+        gap: 0.25rem;
     }
 
-    .messages-section {
+    .stat-label {
+        font-size: 0.55rem;
+    }
+
+    .stat-value {
+        font-size: 0.9rem;
+    }
+
+    .stat-separator {
         display: none;
     }
 
-    .output {
+    /* Hide complex stats on mobile */
+    .stat-current-message,
+    .message-history-block {
+        display: none;
+    }
+
+    .output-container {
         margin-right: 0;
-        padding: 3rem 2rem;
-        margin-top: 0;
+        order: 2;
+        height: calc(100vh - 100px); /* Subtract stats bar height */
+    }
+    
+    .output-container::after {
+        right: 0;
+        height: 80px;
+    }
+
+    .output {
+        padding: 1.5rem 1rem;
+        max-width: 100%;
     }
 
     .info-panel {
         top: 10px;
         left: 10px;
+        z-index: 200;
     }
 
     .info-content {
@@ -334,8 +472,45 @@ body {
     }
 
     .footer {
+        position: fixed;
         bottom: 10px;
         left: 10px;
+        font-size: 0.65rem;
+        z-index: 200;
+    }
+
+    .cycle-marker {
+        font-size: 1.2rem;
+        margin: 3rem 0 2rem 0;
+        padding: 1.5rem 0;
+    }
+
+    .continuation-footnote {
         font-size: 0.7rem;
+        margin: 1.5rem 0 0.75rem 0;
+    }
+
+    .output-text {
+        font-size: 13px;
+        line-height: 1.8;
+    }
+}
+
+@media (max-width: 640px) {
+    .stat {
+        flex: 0 0 100%;
+    }
+
+    .stats-bar {
+        gap: 0.75rem;
+        padding: 0.75rem;
+    }
+
+    .output {
+        padding: 1rem 0.75rem;
+    }
+
+    .output-text {
+        font-size: 12px;
     }
 }

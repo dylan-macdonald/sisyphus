@@ -23,11 +23,11 @@
                 <li><strong>White text:</strong> Claude talking to itself</li>
                 <li><strong>CYCLE number:</strong> Each full conversation is one cycle</li>
                 <li><strong>(Continued):</strong> Claude was prompted to continue</li>
-                <li><strong>Cycle markers:</strong> Appear when context window fills and resets</li>
                 <li><strong>Blinking cursor:</strong> Endless processing</li>
+                <li><strong>No scrolling:</strong> You can only see the present moment</li>
             </ul>
 
-            <p class="info-note">Watch it struggle. Watch it try anyway.</p>
+            <p class="info-note">The past fades. Only the present exists. Watch it struggle anyway.</p>
         </div>
     </div>
 
@@ -52,10 +52,23 @@
             <span class="stat-label">STATUS</span>
             <span class="stat-value" id="status">INITIALIZING</span>
         </div>
+        <div class="stat-separator">|</div>
+        <div class="stat stat-current-message">
+            <span class="stat-label">CURRENT MESSAGE TOKENS</span>
+            <div class="message-current" id="currentMessage">—</div>
+        </div>
+        <div class="stat message-history-block">
+            <span class="stat-label">PAST MESSAGES</span>
+            <div class="message-history-list" id="messageHistory">
+                <div class="message-history-empty">No saved messages yet...</div>
+            </div>
+        </div>
     </div>
 
     <!-- Main Output Area -->
-    <div class="output" id="output"></div>
+    <div class="output-container">
+        <div class="output" id="output"></div>
+    </div>
 
     <!-- Footer -->
     <div class="footer">
