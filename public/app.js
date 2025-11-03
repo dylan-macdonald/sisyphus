@@ -15,6 +15,7 @@ const elements = {
     tokens: document.getElementById('tokens'),
     time: document.getElementById('time'),
     status: document.getElementById('status'),
+    messages: document.getElementById('messages'),
 };
 
 // Constants
@@ -67,6 +68,9 @@ async function startStream() {
                     eventSource.close();
                     break;
                 case 'done':
+                    if (data.messages) {
+                        updateMessages(data.messages);
+                    }
                     eventSource.close();
                     state.isStreaming = false;
                     updateUI();
@@ -229,4 +233,34 @@ function updateTimerDisplay() {
         elements.time.textContent =
             `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
+}
+
+// Update messages display
+function updateMessages(messages) {
+    elements.messages.innerHTML = '';
+
+    if (!messages || messages.length === 0) {
+        elements.messages.innerHTML = '<div style="color: var(--text-dim); font-size: 0.7rem;">No messages yet...</div>';
+        return;
+    }
+
+    // Display last 5 messages
+    messages.forEach(msg => {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message-item';
+
+        const cycleLabel = document.createElement('div');
+        cycleLabel.className = 'message-cycle';
+        cycleLabel.textContent = `CYCLE ${msg.cycle}`;
+
+        const messageText = document.createElement('div');
+        messageText.textContent = msg.text;
+
+        messageDiv.appendChild(cycleLabel);
+        messageDiv.appendChild(messageText);
+        elements.messages.appendChild(messageDiv);
+    });
+
+    // Auto-scroll to bottom
+    elements.messages.scrollTop = elements.messages.scrollHeight;
 }
