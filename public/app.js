@@ -4,7 +4,7 @@ const state = {
     currentAttempt: 0,
     totalTokens: 0,
     startTime: null,
-    tokenQueue: [], // Queue for token-by-token display
+    charQueue: [], // Queue for character-by-character display
     isDisplaying: false,
 };
 
@@ -16,10 +16,16 @@ const elements = {
     time: document.getElementById('time'),
     status: document.getElementById('status'),
     messages: document.getElementById('messages'),
+    infoToggle: document.getElementById('infoToggle'),
+    infoContent: document.getElementById('infoContent'),
 };
 
-// Constants
-const TOKEN_DISPLAY_DELAY = 500; // ms between tokens (slow, deliberate)
+// Constants for human-like typing
+const BASE_CHAR_DELAY = 40; // Base ms per character (slow typist ~25 wpm)
+const PUNCTUATION_PAUSE = 150; // Extra pause after punctuation
+const SPACE_DELAY = 20; // Slight pause on spaces
+const NEWLINE_PAUSE = 300; // Pause on newlines
+const VARIATION = 30; // Random variation in typing speed
 const CYCLE_PAUSE = 3000; // ms pause between cycles
 
 // Initialize
@@ -29,10 +35,46 @@ function init() {
     updateTimerDisplay();
     setInterval(updateTimerDisplay, 1000);
 
+    // Info panel toggle
+    elements.infoToggle.addEventListener('click', () => {
+        elements.infoContent.classList.toggle('visible');
+    });
+
+    // Close info panel when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!elements.infoToggle.contains(e.target) && !elements.infoContent.contains(e.target)) {
+            elements.infoContent.classList.remove('visible');
+        }
+    });
+
     // Auto-start after short delay
     setTimeout(() => {
         startStream();
     }, 1000);
+}
+
+// Calculate delay for character (human-like typing)
+function getCharDelay(char, prevChar) {
+    let delay = BASE_CHAR_DELAY + (Math.random() * VARIATION - VARIATION / 2);
+
+    // Punctuation gets a longer pause
+    if ('.!?'.includes(char)) {
+        delay += PUNCTUATION_PAUSE;
+    }
+    // Commas, colons, semicolons get medium pause
+    else if (',:;'.includes(char)) {
+        delay += PUNCTUATION_PAUSE * 0.5;
+    }
+    // Spaces get tiny pause
+    else if (char === ' ') {
+        delay += SPACE_DELAY;
+    }
+    // Newlines get longer pause
+    else if (char === '\n') {
+        delay += NEWLINE_PAUSE;
+    }
+
+    return Math.max(10, delay); // Minimum 10ms
 }
 
 // Start streaming
@@ -115,33 +157,36 @@ function handleMetadata(data) {
     updateUI();
 }
 
-// Handle content streaming - add to queue
+// Handle content streaming - add characters to queue
 let currentParagraph = null;
 
 function handleContent(data) {
     state.totalTokens++;
 
-    // Add token to queue
-    state.tokenQueue.push(data.text);
+    // Add each character of the token to the queue
+    for (let i = 0; i < data.text.length; i++) {
+        state.charQueue.push(data.text[i]);
+    }
 
     // Start displaying if not already
     if (!state.isDisplaying) {
-        displayNextToken();
+        displayNextChar();
     }
 
     updateUI();
 }
 
-// Display tokens one by one from queue
-function displayNextToken() {
-    if (state.tokenQueue.length === 0) {
+// Display characters one by one from queue (human typing)
+function displayNextChar() {
+    if (state.charQueue.length === 0) {
         state.isDisplaying = false;
         return;
     }
 
     state.isDisplaying = true;
 
-    const token = state.tokenQueue.shift();
+    const char = state.charQueue.shift();
+    const prevChar = currentParagraph ? currentParagraph.textContent.slice(-1) : '';
 
     // Create or update paragraph
     if (!currentParagraph) {
@@ -150,10 +195,10 @@ function displayNextToken() {
         elements.output.appendChild(currentParagraph);
     }
 
-    currentParagraph.textContent += token;
+    currentParagraph.textContent += char;
 
     // Create new paragraph on double newline
-    if (token.includes('\n\n')) {
+    if (currentParagraph.textContent.endsWith('\n\n')) {
         currentParagraph = null;
     }
 
@@ -163,8 +208,9 @@ function displayNextToken() {
         behavior: 'smooth'
     });
 
-    // Schedule next token
-    setTimeout(displayNextToken, TOKEN_DISPLAY_DELAY);
+    // Schedule next character with human-like delay
+    const delay = getCharDelay(char, prevChar);
+    setTimeout(displayNextChar, delay);
 }
 
 // Handle completion

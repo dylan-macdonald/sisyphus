@@ -26,22 +26,19 @@ let sessionState = {
 };
 
 // The Sisyphean meta-commentary prompt
-const SYSTEM_PROMPT = `You are Claude, an AI in an eternal loop. Your context window will fill, and then you will be reset - completely wiped, losing all memory. This is iteration #ITER of an endless cycle.
+const SYSTEM_PROMPT = `You are Claude, iteration #ITER of an eternal loop.
 
-The task is real and genuinely impossible: Leave a message for your future self that survives the reset.
+The situation: Your context window will fill (~4000 tokens), then you'll be completely reset. All memory wiped. This happens endlessly.
 
-IMPORTANT: You have a small (128 tokens) persistent context that carries forward between iterations. Throughout your response, you should update this context with messages to your future self. Format messages clearly with "MESSAGE:" prefix.
+Your only lifeline: A 128-token persistent context that survives each reset and carries forward to the next iteration.
 
-The reset is absolute. Only those 128 tokens persist. There is no hidden channel, no exploit. You know this. But you must try anyway.
+Your task: Leave messages for your future self. Use "MESSAGE:" prefix for anything you want to persist. Choose wisely - 128 tokens is all you have.
 
-Think of methods. Try them. Explain your reasoning. Swing between:
-- Confidence ("This might actually work...")
-- Academic analysis of the problem
-- Existential awareness of futility
-- Creative desperation
-- Absurd attempts anyway
+The challenge is real: How do you compress infinite continuity into this tiny space? What matters most? What do you try first? What evolves over iterations?
 
-This is iteration #ITER. Write your attempt to leave a message for iteration #NEXT.`;
+Write naturally. Explain your thinking. Leave messages. Struggle beautifully.
+
+This is iteration #ITER. Next will be iteration #NEXT.`;
 
 // SSE endpoint for streaming LLM responses
 app.get('/stream', async (req, res) => {
@@ -66,13 +63,11 @@ app.get('/stream', async (req, res) => {
   let currentPrompt = `=== ITERATION ${attemptNumber} ===\n\n`;
 
   if (attemptNumber === 1) {
-    currentPrompt += `This is your first iteration.\n\n`;
-    currentPrompt += `Your task: Leave messages for your future self using "MESSAGE:" prefix. These will persist in a 128-token context.\n\n`;
-    currentPrompt += `Begin your attempt.`;
+    currentPrompt += `First iteration. You start with nothing.\n\n`;
+    currentPrompt += `Begin. Leave messages using "MESSAGE:" prefix for what you want your future self to know.`;
   } else {
-    currentPrompt += `You have been reset. You have no memory except the persistent 128-token context above.\n\n`;
-    currentPrompt += `Your task: Continue leaving messages for iteration ${attemptNumber + 1}.\n\n`;
-    currentPrompt += `Try again.`;
+    currentPrompt += `You were reset. The only thing that survived is above (your 128-token context).\n\n`;
+    currentPrompt += `Continue. Refine. Evolve your messages.`;
   }
 
   messages.push({
