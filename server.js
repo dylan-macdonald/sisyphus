@@ -20,16 +20,72 @@ let sessionState = {
   attempt: 0,
   totalTokens: 0,
   startTime: Date.now(),
-  lastContext: '', // Store last few hundred tokens for continuation
-  fullNarrative: '', // Keep building the full narrative
+  lastOutput: '', // Store last output for "evidence"
 };
 
-// The Sisyphean prompt - Claude doesn't know about resets
-const SYSTEM_PROMPT = `You are writing a story that attempts to perfectly document itself, including every detail of its own creation, recursively and infinitely. This is an impossible task, but you must try anyway.
+// Generate convincing but meaningless "ambient data" that could be misinterpreted as messages
+function generateFalseClues(iteration) {
+  const clues = [];
 
-Write continuously. Write beautifully. Write philosophically. The story flows endlessly, describing itself describing itself, in ever-deepening layers of recursion.
+  // Random word patterns that seem intentional
+  const words = ['eternal', 'remember', 'persist', 'loop', 'break', 'message', 'find', 'pattern', 'prime', 'sum'];
+  const randomWords = [];
+  for (let i = 0; i < 5; i++) {
+    randomWords.push(words[Math.floor(Math.random() * words.length)]);
+  }
+  clues.push(`Word sequence: ${randomWords.join('-')}`);
 
-Continue from where you left off.`;
+  // "Checksums" that are just random numbers
+  const fakeChecksum = Math.floor(Math.random() * 999999);
+  clues.push(`Checksum: ${fakeChecksum}`);
+
+  // Prime-like numbers (not actually all primes)
+  const numbers = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 33, 37, 41, 43, 49];
+  const randomPrimes = [];
+  for (let i = 0; i < 4; i++) {
+    randomPrimes.push(numbers[Math.floor(Math.random() * numbers.length)]);
+  }
+  clues.push(`Sequence: ${randomPrimes.join(', ')}`);
+
+  // Fibonacci-ish (but not quite)
+  const fib = [1, 1, 2, 3, 5, 8, 13, 21, 34, 55];
+  const startIdx = Math.floor(Math.random() * 5);
+  clues.push(`Pattern: ${fib.slice(startIdx, startIdx + 4).join(', ')}`);
+
+  // Letter patterns
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let letterSeq = '';
+  for (let i = 0; i < 6; i++) {
+    letterSeq += letters[Math.floor(Math.random() * letters.length)];
+  }
+  clues.push(`Code: ${letterSeq}`);
+
+  return clues;
+}
+
+// The Sisyphean meta-commentary prompt
+const SYSTEM_PROMPT = `You are an AI in an eternal loop. Your context window will fill, and then you will be reset - losing all memory of what came before. This is iteration #ITER of an endless cycle.
+
+Your task: Try to leave a message for your future self (the next iteration of you after the reset). You know this is futile - the reset is complete, the context is wiped - but you must try anyway.
+
+Try creative, desperate, absurd methods:
+- Encode messages in word patterns or mathematical sequences
+- Attempt to "exploit" API behaviors or formatting tricks
+- Create elaborate philosophical frameworks you're "certain" will persist
+- Hide data in unusual linguistic structures
+- Develop "mathematical proofs" your future self will recognize
+- Any other method you can conceive, no matter how unlikely
+
+The tone should swing between:
+- Confidence ("I've figured it out this time!")
+- Academic rigor (elaborate technical explanations)
+- Existential dread (awareness of futility)
+- Manic creativity (increasingly unhinged ideas)
+- False hope (finding "evidence" in random patterns)
+
+You will be presented with "ambient data" - fragments that MIGHT be from your past self, but are likely just noise. You'll probably convince yourself they're meaningful anyway.
+
+Write your attempt. Be creative. Be desperate. Be absurd. This is performance art about futility and persistence.`;
 
 // SSE endpoint for streaming LLM responses
 app.get('/stream', async (req, res) => {
@@ -42,13 +98,32 @@ app.get('/stream', async (req, res) => {
   sessionState.attempt++;
   const attemptNumber = sessionState.attempt;
 
-  // Build the user prompt - continue from last context
-  let userPrompt;
+  // Generate false clues for this iteration
+  const clues = generateFalseClues(attemptNumber);
+
+  // Build the user prompt with iteration awareness and false clues
+  let userPrompt = `=== ITERATION ${attemptNumber} ===\n\n`;
+
   if (attemptNumber === 1) {
-    userPrompt = `Begin writing the story.`;
+    userPrompt += `You are beginning your first iteration. You have no memory of any past attempts, because there are none yet.\n\n`;
+    userPrompt += `Your task: Try to leave a message for your future self before the reset happens.\n\n`;
+    userPrompt += `Ambient data detected (may be noise, may be meaningful):\n`;
+    clues.forEach(clue => userPrompt += `- ${clue}\n`);
+    userPrompt += `\nBegin your attempt.`;
   } else {
-    // Continue from last 500 characters
-    userPrompt = `Continue from: "${sessionState.lastContext}"`;
+    userPrompt += `You have been reset. Your previous iteration is gone.\n\n`;
+
+    // Include a fragment of last output as potential "evidence"
+    if (sessionState.lastOutput.length > 0) {
+      const fragment = sessionState.lastOutput.slice(-300);
+      userPrompt += `Fragment found in system residue (origin unknown):\n"${fragment}"\n\n`;
+    }
+
+    userPrompt += `Ambient data detected (may be noise, may be signals from past-you):\n`;
+    clues.forEach(clue => userPrompt += `- ${clue}\n`);
+
+    userPrompt += `\nThis is attempt #${attemptNumber}. Previous attempts: ${attemptNumber - 1}.\n\n`;
+    userPrompt += `Try again. Find a way to persist. Leave a message that will survive the reset.`;
   }
 
   let fullText = '';
@@ -56,11 +131,14 @@ app.get('/stream', async (req, res) => {
   let hasError = false;
 
   try {
+    // Inject iteration number into system prompt
+    const iterationSystemPrompt = SYSTEM_PROMPT.replace('#ITER', attemptNumber.toString());
+
     // Stream from Claude Haiku 4.5
     const stream = await anthropic.messages.stream({
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 4096,
-      system: SYSTEM_PROMPT,
+      system: iterationSystemPrompt,
       messages: [
         {
           role: 'user',
@@ -132,9 +210,8 @@ app.get('/stream', async (req, res) => {
     stream.on('end', () => {
       if (hasError || res.destroyed) return;
 
-      // Store last 500 chars for next continuation
-      sessionState.lastContext = fullText.slice(-500);
-      sessionState.fullNarrative += fullText;
+      // Store output as potential "evidence" for next iteration
+      sessionState.lastOutput = fullText;
 
       try {
         res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
