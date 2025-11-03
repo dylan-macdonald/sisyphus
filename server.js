@@ -130,7 +130,8 @@ app.get('/stream', async (req, res) => {
         res.write(`data: ${JSON.stringify({
           type: 'complete',
           totalTokens: sessionState.totalTokens,
-          usage: message.usage
+          usage: message.usage,
+          stop_reason: message.stop_reason
         })}\n\n`);
       } catch (writeError) {
         hasError = true;

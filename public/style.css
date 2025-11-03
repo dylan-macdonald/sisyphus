@@ -23,66 +23,62 @@ body {
     font-size: 14px;
 }
 
-/* Stats Bar */
+/* Stats Sidebar */
 .stats-bar {
     position: fixed;
     top: 0;
-    left: 0;
     right: 0;
+    bottom: 0;
+    width: 200px;
     display: flex;
-    align-items: center;
+    flex-direction: column;
     justify-content: center;
-    gap: 2rem;
-    padding: 1.5rem;
+    gap: 3rem;
+    padding: 2rem;
     background: var(--bg-secondary);
-    border-bottom: 1px solid var(--border);
+    border-left: 1px solid var(--border);
     z-index: 100;
 }
 
 .stat {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 0.25rem;
+    align-items: flex-start;
+    gap: 0.5rem;
 }
 
 .stat-label {
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     color: var(--text-dim);
     letter-spacing: 0.15em;
+    text-transform: uppercase;
 }
 
 .stat-value {
-    font-size: 1rem;
+    font-size: 1.1rem;
     color: var(--text);
     font-weight: bold;
     letter-spacing: 0.05em;
 }
 
 .stat-separator {
-    color: var(--border);
-    font-size: 1rem;
+    display: none;
 }
 
 /* Output Area */
 .output {
-    margin-top: 80px;
-    padding: 4rem 2rem 4rem 2rem;
-    max-width: 800px;
-    margin-left: auto;
-    margin-right: auto;
-    min-height: calc(100vh - 80px);
+    margin-right: 200px;
+    padding: 4rem 4rem 4rem 4rem;
+    max-width: 900px;
+    min-height: 100vh;
 }
 
 .output-text {
-    color: var(--text-bright);
-    margin-bottom: 1.5rem;
+    color: var(--accent);
+    margin-bottom: 0;
     white-space: pre-wrap;
     word-wrap: break-word;
-    background: var(--bg-secondary);
-    padding: 1.5rem;
-    border-left: 2px solid var(--border);
-    border-radius: 4px;
+    line-height: 2;
 }
 
 .cycle-marker {
@@ -97,45 +93,47 @@ body {
     letter-spacing: 0.2em;
 }
 
-/* Status indicators */
-.status-streaming {
+/* Status indicators - always show blink */
+.status-streaming,
+.status-waiting,
+.status-error {
     color: var(--accent);
 }
 
-.status-waiting {
-    color: var(--text-dim);
+.status-streaming::after,
+.status-waiting::after,
+.status-error::after {
+    content: '█';
+    margin-left: 0.25rem;
+    animation: blink 1s infinite;
 }
 
-.status-error {
-    color: var(--text-bright);
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .stats-bar {
-        flex-wrap: wrap;
-        gap: 1rem;
-        padding: 1rem;
-    }
-
-    .stat-separator {
-        display: none;
-    }
-
-    .output {
-        padding: 3rem 1.5rem;
-        margin-top: 100px;
-    }
-}
-
-/* Subtle cursor blink effect for streaming status */
+/* Blink animation */
 @keyframes blink {
     0%, 49% { opacity: 1; }
     50%, 100% { opacity: 0.3; }
 }
 
-.status-streaming::after {
-    content: '█';
-    margin-left: 0.25rem;
-    animation: blink 1s infinite;
+/* Responsive */
+@media (max-width: 1024px) {
+    .stats-bar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        flex-direction: row;
+        justify-content: space-around;
+        gap: 1rem;
+        padding: 1.5rem;
+        border-left: none;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .stat {
+        align-items: center;
+    }
+
+    .output {
+        margin-right: 0;
+        padding: 3rem 2rem;
+    }
 }
