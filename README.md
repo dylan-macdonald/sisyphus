@@ -25,13 +25,14 @@ Each iteration:
 ## Features
 
 - **Automatic Streaming**: Starts immediately, continues eternally
-- **Minimal Design**: Grayscale aesthetic, no distractions
-- **Human-Readable Pacing**: Slow, deliberate token display (120ms between tokens)
+- **Minimal Design**: Pure black background, white text, sidebar stats
+- **Meditative Pacing**: Very slow, deliberate token display (500ms between tokens)
 - **Meta-Awareness**: Claude knows about the loop and the futility
 - **Real Task**: No fake clues or tricks - the impossibility is genuine
 - **Fragment Evidence**: Each iteration sees the end of its previous attempt
 - **Iteration Counter**: Watch the number climb while memory resets
-- **Visual Highlighting**: LLM responses subtly highlighted for readability
+- **Persistent Cursor**: Always-blinking cursor suggesting endless processing
+- **Cycle Markers**: Only shown when context window is fully depleted (max_tokens)
 - **No Interaction**: A passive, darkly comic experience
 
 ## Quick Start
@@ -72,10 +73,12 @@ Open `http://localhost:3000` and watch.
 
 **Frontend**
 - Minimal HTML structure
-- Grayscale CSS with subtle visual highlighting for responses
-- Token queue for consistent, human-readable display timing (120ms)
+- Pure black/white aesthetic with sidebar stats
+- Token queue for meditative display timing (500ms)
 - Auto-scrolling, auto-continuing
-- Highlighted response boxes with brighter text
+- White text on black, clean spacing
+- Persistent blinking cursor effect
+- Cycle markers only on full context depletion
 
 ## Philosophy
 
@@ -95,15 +98,15 @@ This explores:
 
 **Change the meta-commentary style**: Edit `SYSTEM_PROMPT` in `server.js`
 
-**Adjust timing**: Modify `TOKEN_DISPLAY_DELAY` (120ms) and `CYCLE_PAUSE` (2s) in `app.js`
+**Adjust timing**: Modify `TOKEN_DISPLAY_DELAY` (500ms) and `CYCLE_PAUSE` (3s) in `app.js`
 
 **Model settings**: Change `model` and `max_tokens` in `server.js`
 
 **Fragment size**: Change how much of previous output is shown (currently 400 chars)
 
-**Visual highlighting**: Adjust `.output-text` styles in `style.css`
+**Sidebar position**: Modify `.stats-bar` in `style.css` (currently right sidebar)
 
-**Visual style**: Edit CSS variables in `style.css` (though the grayscale aesthetic is intentional)
+**Visual style**: Edit CSS variables in `style.css` (pure black/white aesthetic is intentional)
 
 ## API Endpoints
 
