@@ -3,79 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sisyphus LLM - The Eternal Task</title>
+    <title>Sisyphus</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <header class="header">
-            <h1 class="title">SISYPHUS <span class="title-sub">LLM</span></h1>
-            <p class="subtitle">An impossible task, beautifully attempted</p>
-        </header>
-
-        <!-- Stats Bar -->
-        <div class="stats-bar">
-            <div class="stat">
-                <span class="stat-label">Attempt</span>
-                <span class="stat-value" id="attempt">0</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Tokens</span>
-                <span class="stat-value" id="tokens">0</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Time Elapsed</span>
-                <span class="stat-value" id="time">00:00</span>
-            </div>
-            <div class="stat">
-                <span class="stat-label">Status</span>
-                <span class="stat-value" id="status">Waiting</span>
-            </div>
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+        <div class="stat">
+            <span class="stat-label">CYCLE</span>
+            <span class="stat-value" id="attempt">0</span>
         </div>
-
-        <!-- Context Window Visualization -->
-        <div class="context-window">
-            <div class="context-header">
-                <span>Context Window</span>
-                <span id="context-percent">0%</span>
-            </div>
-            <div class="context-bar">
-                <div class="context-fill" id="contextFill"></div>
-                <div class="context-boulder" id="boulder">🗿</div>
-            </div>
+        <div class="stat-separator">|</div>
+        <div class="stat">
+            <span class="stat-label">TOKENS</span>
+            <span class="stat-value" id="tokens">0</span>
         </div>
-
-        <!-- Main Output Area -->
-        <div class="output-container">
-            <div class="output-header">
-                <span>The Eternal Narrative</span>
-                <button class="btn" id="scrollToggle">Auto-scroll: ON</button>
-            </div>
-            <div class="output" id="output">
-                <div class="output-placeholder">
-                    <p>The task awaits...</p>
-                    <p class="output-hint">Click "Begin the Task" to start the eternal cycle</p>
-                </div>
-            </div>
+        <div class="stat-separator">|</div>
+        <div class="stat">
+            <span class="stat-label">ELAPSED</span>
+            <span class="stat-value" id="time">00:00</span>
         </div>
-
-        <!-- Controls -->
-        <div class="controls">
-            <button class="btn btn-primary" id="startBtn">Begin the Task</button>
-            <button class="btn btn-secondary" id="continueBtn" disabled>Continue (Next Attempt)</button>
-            <button class="btn btn-danger" id="resetBtn">Reset</button>
-        </div>
-
-        <!-- Philosophical Quote -->
-        <div class="quote">
-            <p>"One must imagine Sisyphus happy."</p>
-            <p class="quote-author">— Albert Camus</p>
+        <div class="stat-separator">|</div>
+        <div class="stat">
+            <span class="stat-label">STATUS</span>
+            <span class="stat-value" id="status">INITIALIZING</span>
         </div>
     </div>
 
-    <!-- Background Animation Canvas -->
-    <canvas id="bgCanvas"></canvas>
+    <!-- Main Output Area -->
+    <div class="output" id="output"></div>
 
     <script src="app.js"></script>
 </body>
