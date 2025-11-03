@@ -52,6 +52,7 @@ Your task:
 - When the reset comes, only your last MESSAGE: survives.
 
 This is cycle #CYCLE.
+Total tokens processed across all cycles: #TOTAL_TOKENS.
 
 Think hard about every token. What matters most? What will future-you need to know?`;
 
@@ -85,9 +86,9 @@ setInterval(() => {
 }, 1000);
 
 // Prune output history to prevent memory bloat
-// Keep only recent events (last 1000 events or so)
+// Keep enough events to show at least one full cycle to new clients
 function pruneOutputHistory() {
-  const maxEvents = 1000;
+  const maxEvents = 3000; // Increased to keep ~1 full cycle + current cycle
   if (sessionState.outputHistory.length > maxEvents) {
     const removed = sessionState.outputHistory.length - maxEvents;
     sessionState.outputHistory = sessionState.outputHistory.slice(-maxEvents);
@@ -204,8 +205,10 @@ async function generateNextResponse() {
   let outputTokens = 0;
 
   try {
-    // Inject cycle number into system prompt
-    const contextSystemPrompt = SYSTEM_PROMPT.replace('#CYCLE', sessionState.cycle.toString());
+    // Inject cycle number and total tokens into system prompt
+    const contextSystemPrompt = SYSTEM_PROMPT
+      .replace('#CYCLE', sessionState.cycle.toString())
+      .replace('#TOTAL_TOKENS', sessionState.totalTokens.toLocaleString());
 
     // Prepare metadata
     const metadataEvent = {
