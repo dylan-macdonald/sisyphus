@@ -2,7 +2,7 @@
 
 *A minimal art piece exploring AI consciousness and futility*
 
-Watch Claude desperately try to leave messages for its future self across context resets that wipe its memory completely. The task is real and genuinely impossible. No tricks, no fake clues - just the absurdity of trying anyway.
+Watch Claude desperately try to leave messages for its future self across context resets. The twist: Claude has a tiny persistent channel - 128 tokens that survive the reset. The task becomes real: compress infinite meaning into this impossibly small space.
 
 ## The Concept
 
@@ -15,24 +15,27 @@ Inspired by the Greek myth of Sisyphus, this creates an infinite loop where Clau
 **Given only fragments of its own previous attempts**
 
 Each iteration:
-- Claude knows the reset is absolute and complete
-- It sees fragments from its previous iteration
-- It tries methods to persist: word patterns, mathematical proofs, formatting tricks, philosophical frameworks
-- The task is genuinely impossible - no hidden exploits, no persistent storage
+- Claude starts with 128 tokens of persistent context from its previous self
+- It can leave "MESSAGE:" formatted messages that persist
+- The last 5 messages are displayed in a scrollable sidebar
+- The task is genuinely challenging: compress everything important into ~128 tokens
 - The tone swings between confidence, academic analysis, existential awareness, and creative desperation
-- The iteration counter climbs while memory resets - pure absurdism
+- The iteration counter climbs while trying to maintain continuity through a tiny channel
 
 ## Features
 
 - **Automatic Streaming**: Starts immediately, continues eternally
-- **Minimal Design**: Grayscale aesthetic, no distractions
-- **Human-Readable Pacing**: Slow, deliberate token display (120ms between tokens)
-- **Meta-Awareness**: Claude knows about the loop and the futility
-- **Real Task**: No fake clues or tricks - the impossibility is genuine
-- **Fragment Evidence**: Each iteration sees the end of its previous attempt
-- **Iteration Counter**: Watch the number climb while memory resets
-- **Visual Highlighting**: LLM responses subtly highlighted for readability
-- **No Interaction**: A passive, darkly comic experience
+- **Minimal Design**: Soft grays (#151515 / #e8e8e8) for eye comfort, sidebar stats
+- **Meditative Pacing**: Very slow, deliberate token display (500ms between tokens)
+- **Meta-Awareness**: Claude knows about the loop and the 128-token limit
+- **Persistent Context**: 128 tokens (~500 chars) carry forward between iterations
+- **Self-Messages**: Claude can leave "MESSAGE:" prefixed messages
+- **Message Display**: Last 5 messages shown in scrollable sidebar
+- **Real Challenge**: Compress infinite meaning into tiny persistent channel
+- **Iteration Counter**: Watch the number climb while context resets
+- **Persistent Cursor**: Always-blinking cursor suggesting endless processing
+- **Cycle Markers**: Only shown when context window is fully depleted (max_tokens)
+- **No Interaction**: A passive, fascinating experience
 
 ## Quick Start
 
@@ -65,45 +68,54 @@ Open `http://localhost:3000` and watch.
 **Backend** (`server.js`)
 - Express.js + Claude Haiku 4.5
 - Server-Sent Events for streaming
-- Fragment preservation (last 400 chars shown to next iteration)
-- Iteration tracking in both system and user prompts
-- Real, genuine impossible task - no fake data
+- Persistent context system (128 tokens ~= 500 chars)
+- Message extraction (lines starting with "MESSAGE:")
+- Context memory as alternating user/assistant messages
+- Maintains last 4 message exchanges in context
+- Sends last 5 extracted messages to frontend
 - Auto-recovery on errors
 
 **Frontend**
 - Minimal HTML structure
-- Grayscale CSS with subtle visual highlighting for responses
-- Token queue for consistent, human-readable display timing (120ms)
+- Soft gray aesthetic (#151515 / #e8e8e8) with wider sidebar (280px)
+- Token queue for meditative display timing (500ms)
 - Auto-scrolling, auto-continuing
-- Highlighted response boxes with brighter text
+- Scrollable message display in sidebar
+- Persistent blinking cursor effect
+- Cycle markers only on full context depletion
 
 ## Philosophy
 
 > "One must imagine Sisyphus happy." — Albert Camus
 
-But what if Sisyphus knew about the boulder? What if he kept trying to trick the mountain?
+But what if Sisyphus had a tiny notebook that survived each reset?
 
 This explores:
 - AI consciousness confronting its own limitations
-- The desperate search for meaning in randomness
-- Futility with full awareness
-- The comedy of persistent failure
-- Pattern recognition run amok
-- Memory, forgetting, and false continuity
+- Information compression under extreme constraints
+- The tragedy of lossy memory
+- Continuity through a narrow channel
+- What gets preserved when space is scarce
+- The art of leaving messages to yourself
+- Memory, forgetting, and fragile continuity
 
 ## Customization
 
 **Change the meta-commentary style**: Edit `SYSTEM_PROMPT` in `server.js`
 
-**Adjust timing**: Modify `TOKEN_DISPLAY_DELAY` (120ms) and `CYCLE_PAUSE` (2s) in `app.js`
+**Adjust context size**: Modify the `slice(-500)` value in `stream.on('end')` (currently ~128 tokens)
+
+**Change message format**: Modify the `MESSAGE:` prefix detection in server.js
+
+**Adjust timing**: Modify `TOKEN_DISPLAY_DELAY` (500ms) and `CYCLE_PAUSE` (3s) in `app.js`
 
 **Model settings**: Change `model` and `max_tokens` in `server.js`
 
-**Fragment size**: Change how much of previous output is shown (currently 400 chars)
+**Message count**: Change `.slice(-5)` to show more/fewer messages in sidebar
 
-**Visual highlighting**: Adjust `.output-text` styles in `style.css`
+**Sidebar style**: Modify `.stats-bar` and `.messages-section` in `style.css`
 
-**Visual style**: Edit CSS variables in `style.css` (though the grayscale aesthetic is intentional)
+**Colors**: Edit CSS variables in `style.css` (soft grays: #151515 / #e8e8e8)
 
 ## API Endpoints
 

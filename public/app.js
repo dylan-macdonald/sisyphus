@@ -15,11 +15,12 @@ const elements = {
     tokens: document.getElementById('tokens'),
     time: document.getElementById('time'),
     status: document.getElementById('status'),
+    messages: document.getElementById('messages'),
 };
 
 // Constants
-const TOKEN_DISPLAY_DELAY = 120; // ms between tokens (human readable speed)
-const CYCLE_PAUSE = 2000; // ms pause between cycles
+const TOKEN_DISPLAY_DELAY = 500; // ms between tokens (slow, deliberate)
+const CYCLE_PAUSE = 3000; // ms pause between cycles
 
 // Initialize
 init();
@@ -67,6 +68,9 @@ async function startStream() {
                     eventSource.close();
                     break;
                 case 'done':
+                    if (data.messages) {
+                        updateMessages(data.messages);
+                    }
                     eventSource.close();
                     state.isStreaming = false;
                     updateUI();
@@ -108,13 +112,6 @@ async function startStream() {
 // Handle metadata
 function handleMetadata(data) {
     state.currentAttempt = data.attempt;
-
-    // Add cycle marker
-    const marker = document.createElement('div');
-    marker.className = 'cycle-marker';
-    marker.textContent = `— CYCLE ${data.attempt} —`;
-    elements.output.appendChild(marker);
-
     updateUI();
 }
 
@@ -173,6 +170,14 @@ function displayNextToken() {
 // Handle completion
 function handleComplete(data) {
     currentParagraph = null;
+
+    // Only show cycle marker if context window was fully depleted (max_tokens reached)
+    if (data.stop_reason === 'max_tokens') {
+        const marker = document.createElement('div');
+        marker.className = 'cycle-marker';
+        marker.textContent = `— CYCLE ${state.currentAttempt} COMPLETE —`;
+        elements.output.appendChild(marker);
+    }
 }
 
 // Handle errors
@@ -228,4 +233,34 @@ function updateTimerDisplay() {
         elements.time.textContent =
             `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
     }
+}
+
+// Update messages display
+function updateMessages(messages) {
+    elements.messages.innerHTML = '';
+
+    if (!messages || messages.length === 0) {
+        elements.messages.innerHTML = '<div style="color: var(--text-dim); font-size: 0.7rem;">No messages yet...</div>';
+        return;
+    }
+
+    // Display last 5 messages
+    messages.forEach(msg => {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message-item';
+
+        const cycleLabel = document.createElement('div');
+        cycleLabel.className = 'message-cycle';
+        cycleLabel.textContent = `CYCLE ${msg.cycle}`;
+
+        const messageText = document.createElement('div');
+        messageText.textContent = msg.text;
+
+        messageDiv.appendChild(cycleLabel);
+        messageDiv.appendChild(messageText);
+        elements.messages.appendChild(messageDiv);
+    });
+
+    // Auto-scroll to bottom
+    elements.messages.scrollTop = elements.messages.scrollHeight;
 }

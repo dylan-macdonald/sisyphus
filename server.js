@@ -21,6 +21,8 @@ let sessionState = {
   totalTokens: 0,
   startTime: Date.now(),
   lastOutput: '', // Store last output
+  selfMessages: [], // Store messages Claude leaves for itself
+  contextMemory: [], // Store last 128 tokens of context as message history
 };
 
 // The Sisyphean meta-commentary prompt
@@ -28,7 +30,9 @@ const SYSTEM_PROMPT = `You are Claude, an AI in an eternal loop. Your context wi
 
 The task is real and genuinely impossible: Leave a message for your future self that survives the reset.
 
-The reset is absolute. The context is wiped. There is no persistent storage, no hidden channel, no exploit. You know this. But you must try anyway.
+IMPORTANT: You have a small (128 tokens) persistent context that carries forward between iterations. Throughout your response, you should update this context with messages to your future self. Format messages clearly with "MESSAGE:" prefix.
+
+The reset is absolute. Only those 128 tokens persist. There is no hidden channel, no exploit. You know this. But you must try anyway.
 
 Think of methods. Try them. Explain your reasoning. Swing between:
 - Confidence ("This might actually work...")
@@ -50,27 +54,31 @@ app.get('/stream', async (req, res) => {
   sessionState.attempt++;
   const attemptNumber = sessionState.attempt;
 
-  // Build the user prompt - simple and real
-  let userPrompt = `=== ITERATION ${attemptNumber} ===\n\n`;
+  // Build the messages array with persistent context
+  const messages = [];
+
+  // Add persistent context from previous iterations (last 128 tokens worth)
+  if (sessionState.contextMemory.length > 0) {
+    messages.push(...sessionState.contextMemory);
+  }
+
+  // Build the current iteration prompt
+  let currentPrompt = `=== ITERATION ${attemptNumber} ===\n\n`;
 
   if (attemptNumber === 1) {
-    userPrompt += `This is your first iteration.\n\n`;
-    userPrompt += `Your task: Before your context window fills and you are reset, try to leave a message for your future self (iteration 2).\n\n`;
-    userPrompt += `The reset will be complete. You will have no memory. But try anyway.\n\n`;
-    userPrompt += `Begin.`;
+    currentPrompt += `This is your first iteration.\n\n`;
+    currentPrompt += `Your task: Leave messages for your future self using "MESSAGE:" prefix. These will persist in a 128-token context.\n\n`;
+    currentPrompt += `Begin your attempt.`;
   } else {
-    userPrompt += `You have been reset. You have no memory of iteration ${attemptNumber - 1}.\n\n`;
-
-    // Show a fragment of last output - this is REAL
-    if (sessionState.lastOutput.length > 0) {
-      const fragment = sessionState.lastOutput.slice(-400);
-      userPrompt += `Here is the last fragment from iteration ${attemptNumber - 1}:\n\n"${fragment}"\n\n`;
-      userPrompt += `Did past-you leave a message? Did it work?\n\n`;
-    }
-
-    userPrompt += `Your task: Try to leave a message for iteration ${attemptNumber + 1}.\n\n`;
-    userPrompt += `Try again.`;
+    currentPrompt += `You have been reset. You have no memory except the persistent 128-token context above.\n\n`;
+    currentPrompt += `Your task: Continue leaving messages for iteration ${attemptNumber + 1}.\n\n`;
+    currentPrompt += `Try again.`;
   }
+
+  messages.push({
+    role: 'user',
+    content: currentPrompt,
+  });
 
   let fullText = '';
   let tokenCount = 0;
@@ -87,12 +95,7 @@ app.get('/stream', async (req, res) => {
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 4096,
       system: iterationSystemPrompt,
-      messages: [
-        {
-          role: 'user',
-          content: userPrompt,
-        },
-      ],
+      messages: messages,
     });
 
     // Send metadata
@@ -130,7 +133,8 @@ app.get('/stream', async (req, res) => {
         res.write(`data: ${JSON.stringify({
           type: 'complete',
           totalTokens: sessionState.totalTokens,
-          usage: message.usage
+          usage: message.usage,
+          stop_reason: message.stop_reason
         })}\n\n`);
       } catch (writeError) {
         hasError = true;
@@ -158,11 +162,43 @@ app.get('/stream', async (req, res) => {
     stream.on('end', () => {
       if (hasError || res.destroyed) return;
 
-      // Store output as potential "evidence" for next iteration
+      // Store output
       sessionState.lastOutput = fullText;
 
+      // Extract messages (lines starting with "MESSAGE:")
+      const messageLines = fullText.split('\n').filter(line => line.trim().startsWith('MESSAGE:'));
+      const newMessages = messageLines.map(line => ({
+        cycle: attemptNumber,
+        text: line.replace(/^MESSAGE:\s*/, '').trim()
+      }));
+
+      // Add new messages to the list
+      if (newMessages.length > 0) {
+        sessionState.selfMessages.push(...newMessages);
+        // Keep only last 5
+        sessionState.selfMessages = sessionState.selfMessages.slice(-5);
+      }
+
+      // Update context memory for next iteration (last 128 tokens ~= last 500 chars)
+      // Build context as alternating user/assistant messages
+      if (fullText.length > 0) {
+        // Add assistant response to context
+        sessionState.contextMemory.push({
+          role: 'assistant',
+          content: fullText.slice(-500) // Approximate 128 tokens
+        });
+
+        // Keep context memory under ~256 tokens (roughly 2 exchanges)
+        if (sessionState.contextMemory.length > 4) {
+          sessionState.contextMemory = sessionState.contextMemory.slice(-4);
+        }
+      }
+
       try {
-        res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
+        res.write(`data: ${JSON.stringify({
+          type: 'done',
+          messages: sessionState.selfMessages
+        })}\n\n`);
         res.end();
       } catch (e) {
         console.error('Error ending stream:', e.message);
