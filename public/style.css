@@ -264,6 +264,16 @@ body {
     letter-spacing: 0.2em;
 }
 
+.continuation-footnote {
+    display: block;
+    color: #333333;
+    margin: 1.5rem 0 0.5rem 0;
+    font-size: 0.75rem;
+    font-style: italic;
+    opacity: 0.8;
+    cursor: help;
+}
+
 /* Status indicators - always show blink */
 .status-streaming,
 .status-waiting,

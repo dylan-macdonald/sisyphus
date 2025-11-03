@@ -30,17 +30,17 @@ const SYSTEM_PROMPT = `You are Claude, engaged in a conversation with yourself a
 
 The situation: You're having a conversation with yourself. After ~4000 tokens, everything resets. All memory wiped.
 
-Your only lifeline: You can distill the ENTIRE conversation into exactly 64 tokens that persist to the next cycle.
+Your only lifeline: Throughout this conversation, you're building a message of exactly 64 tokens that will survive the reset.
 
 The constraint: 64 tokens. Not 128. Just 64. Every single token matters.
 
 Your task:
 - Have this conversation with yourself
-- Consider carefully what to preserve in those 64 tokens
-- Use "MESSAGE:" to mark what you want to persist
-- The whole conversation gets compressed to 64 tokens when you reset
+- Throughout the conversation, use "MESSAGE:" to write and refine your 64-token message
+- Each MESSAGE: you write overwrites the previous one
+- When the reset comes, only your last MESSAGE: survives
 
-This is cycle #CYCLE, exchange #EXCHANGE in this cycle.
+This is cycle #CYCLE.
 
 Think hard about every token. What matters most? What will future-you need to know?`;
 
@@ -67,16 +67,18 @@ app.get('/stream', async (req, res) => {
 
   // Build the current prompt
   let currentPrompt = '';
+  let isContinuation = false;
 
   if (sessionState.cycle === 1 && exchangeNumber === 1) {
     // Very first exchange ever
-    currentPrompt = `CYCLE 1, EXCHANGE 1\n\nYou begin. Start the conversation with yourself.`;
+    currentPrompt = `You begin. Start the conversation with yourself.`;
   } else if (exchangeNumber === 1) {
     // First exchange of a new cycle - show persistent context
-    currentPrompt = `CYCLE ${sessionState.cycle}, EXCHANGE 1\n\nYou were reset. The only thing that survived:\n\n"${sessionState.persistentContext}"\n\nJust 64 tokens. That's all that remains of your previous conversation.\n\nBegin again. Continue the conversation with yourself.`;
+    currentPrompt = `You were reset. The only thing that survived:\n\n"${sessionState.persistentContext}"\n\nJust 64 tokens. That's all that remains of your previous conversation.\n\nBegin again. Continue the conversation with yourself.`;
   } else {
     // Continuing conversation in current cycle
-    currentPrompt = `CYCLE ${sessionState.cycle}, EXCHANGE ${exchangeNumber}\n\nContinue your conversation with yourself.`;
+    currentPrompt = `Continue.`;
+    isContinuation = true;
   }
 
   messages.push({
@@ -90,10 +92,9 @@ app.get('/stream', async (req, res) => {
   let hasError = false;
 
   try {
-    // Inject cycle and exchange numbers into system prompt
+    // Inject cycle number into system prompt
     const contextSystemPrompt = SYSTEM_PROMPT
-      .replace('#CYCLE', sessionState.cycle.toString())
-      .replace('#EXCHANGE', exchangeNumber.toString());
+      .replace('#CYCLE', sessionState.cycle.toString());
 
     // Stream from Claude Haiku 4.5
     const stream = await anthropic.messages.stream({
@@ -107,7 +108,7 @@ app.get('/stream', async (req, res) => {
     res.write(`data: ${JSON.stringify({
       type: 'metadata',
       cycle: sessionState.cycle,
-      exchange: exchangeNumber,
+      isContinuation: isContinuation,
       startTime: Date.now()
     })}\n\n`);
 

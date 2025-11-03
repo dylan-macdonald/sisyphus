@@ -2,7 +2,7 @@
 const state = {
     isStreaming: false,
     currentCycle: 0,
-    currentExchange: 0,
+    isContinuation: false,
     totalTokens: 0,
     conversationTokens: 0,
     startTime: null,
@@ -186,7 +186,17 @@ async function startStream() {
 // Handle metadata
 function handleMetadata(data) {
     state.currentCycle = data.cycle;
-    state.currentExchange = data.exchange;
+    state.isContinuation = data.isContinuation;
+
+    // Add (Continued) footnote if this is a continuation
+    if (data.isContinuation) {
+        const footnote = document.createElement('div');
+        footnote.className = 'continuation-footnote';
+        footnote.textContent = '(Continued)';
+        footnote.title = 'Claude was prompted to continue the conversation';
+        elements.output.appendChild(footnote);
+    }
+
     updateUI();
 }
 
@@ -267,7 +277,7 @@ function handleError(data) {
 
 // Update UI
 function updateUI() {
-    elements.cycle.textContent = `${state.currentCycle}.${state.currentExchange}`;
+    elements.cycle.textContent = state.currentCycle;
     elements.tokens.textContent = state.totalTokens.toLocaleString();
 
     // Update status

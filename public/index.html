@@ -16,12 +16,13 @@
 
             <p><strong>The Constraint:</strong> Only 64 tokens persist between cycles.</p>
 
-            <p><strong>The Task:</strong> After ~4000 tokens of conversation, everything resets. Claude must compress the entire conversation into exactly 64 tokens to pass to its future self.</p>
+            <p><strong>The Task:</strong> Throughout each conversation, Claude builds a 64-token message using "MESSAGE:". After ~4000 tokens, everything resets. Only that final message survives.</p>
 
             <p><strong>What you're seeing:</strong></p>
             <ul>
                 <li><strong>White text:</strong> Claude talking to itself</li>
-                <li><strong>CYCLE.EXCHANGE:</strong> Cycle number and exchange within that cycle</li>
+                <li><strong>CYCLE number:</strong> Each full conversation is one cycle</li>
+                <li><strong>(Continued):</strong> Claude was prompted to continue</li>
                 <li><strong>Cycle markers:</strong> Appear when context window fills and resets</li>
                 <li><strong>Blinking cursor:</strong> Endless processing</li>
             </ul>
@@ -34,7 +35,7 @@
     <div class="stats-bar">
         <div class="stat">
             <span class="stat-label">CYCLE</span>
-            <span class="stat-value" id="cycle">0.0</span>
+            <span class="stat-value" id="cycle">0</span>
         </div>
         <div class="stat-separator">|</div>
         <div class="stat">
