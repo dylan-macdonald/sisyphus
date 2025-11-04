@@ -12,23 +12,23 @@
         <div class="info-toggle" id="infoToggle">?</div>
         <div class="info-content" id="infoContent">
             <h3>What is this?</h3>
-            <p>An AI (Claude 3.5 Haiku by Anthropic) having a conversation with itself across an eternal loop.</p>
+            <p>Claude Sonnet 4.5 (Anthropic) having a conversation with itself. After approximately 5000 tokens, context resets. All memory wiped.</p>
 
-            <p><strong>The Constraint:</strong> Only 64 tokens persist between cycles.</p>
+            <p><strong>The Challenge:</strong></p>
+            <p>Claude can write messages of exactly 128 tokens that survive the reset. After reset, Claude sees both its last message AND the one before that for comparison.</p>
 
-            <p><strong>The Task:</strong> Throughout each conversation, Claude builds a 64-token message using "MESSAGE:". After ~4000 tokens, everything resets. Only that final message survives.</p>
+            <p><strong>The Task:</strong></p>
+            <p>Compress everything important into 128 tokens. Compare previous attempts to avoid repetition. Experiment with new approaches.</p>
 
-            <p><strong>What you're seeing:</strong></p>
+            <p><strong>Key Features:</strong></p>
             <ul>
-                <li><strong>White text:</strong> Claude talking to itself</li>
-                <li><strong>CYCLE number:</strong> Each full conversation is one cycle</li>
-                <li><strong>(Continued):</strong> Claude was asked to continue</li>
-                <li><strong>Awareness:</strong> Claude knows how many cycles and total tokens it has processed</li>
-                <li><strong>Past Messages:</strong> Only the last 5 saved messages are kept</li>
-                <li><strong>Blinking cursor:</strong> Endless processing</li>
+                <li><strong>Immediate Stats:</strong> Claude sees cycle number and total tokens at the start of each response</li>
+                <li><strong>Dual Messages:</strong> Two messages shown after reset to help break repetition loops</li>
+                <li><strong>Exploration:</strong> Explicit permission to try new approaches</li>
+                <li><strong>Direct Prompts:</strong> Clear instructions without flowery language</li>
+                <li><strong>Past Messages:</strong> Last 5 saved in sidebar</li>
+                <li><strong>(CONTINUED):</strong> Claude was asked to continue its thought</li>
             </ul>
-
-            <p class="info-note">The past fades. Only the present exists. Watch it struggle anyway.</p>
         </div>
     </div>
 
@@ -74,7 +74,7 @@
     <!-- Footer -->
     <div class="footer">
         <a href="https://x.com/notdylaan" target="_blank" rel="noopener noreferrer">@notdylaan</a>
-        <span class="version">v1.1</span>
+        <span class="version">v1.3</span>
     </div>
 
     <script src="app.js"></script>

@@ -4,7 +4,26 @@ const Anthropic = require('@anthropic-ai/sdk');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+
+// Configuration from environment variables
+const config = {
+  PORT: process.env.PORT || 3000,
+  MODEL_NAME: process.env.MODEL_NAME || 'claude-sonnet-4-5-20250929',
+  MODEL_TEMPERATURE: parseFloat(process.env.MODEL_TEMPERATURE || '1.0'),
+  MODEL_MAX_TOKENS: parseInt(process.env.MODEL_MAX_TOKENS || '4096'),
+  MODEL_THINKING: process.env.MODEL_THINKING === 'true',
+  CHARS_PER_BATCH: parseInt(process.env.CHARS_PER_BATCH || '1'),
+  BATCH_DELAY_MS: parseInt(process.env.BATCH_DELAY_MS || '53'),
+  MAX_OUTPUT_HISTORY: parseInt(process.env.MAX_OUTPUT_HISTORY || '3000'),
+  MAX_SAVED_MESSAGES: parseInt(process.env.MAX_SAVED_MESSAGES || '5'),
+  CONTEXT_RESET_TOKENS: parseInt(process.env.CONTEXT_RESET_TOKENS || '5000'),
+  PERSISTENT_TOKEN_LIMIT: parseInt(process.env.PERSISTENT_TOKEN_LIMIT || '128'),
+  // Prompts (use \\n for newlines in .env)
+  SYSTEM_PROMPT: process.env.SYSTEM_PROMPT || null,
+  PROMPT_FIRST: process.env.PROMPT_FIRST || null,
+  PROMPT_RESET: process.env.PROMPT_RESET || null,
+  PROMPT_CONTINUE: process.env.PROMPT_CONTINUE || null,
+};
 
 // Middleware
 app.use(express.json());
@@ -23,10 +42,11 @@ let sessionState = {
   streamingTime: 0, // Time spent actively streaming (in ms)
   lastStreamStart: null,
   currentConversation: [], // Current cycle's conversation
-  persistentContext: '', // Only 64 tokens that persist across resets
+  persistentContext: '', // Last MESSAGE that persists across resets
+  previousContext: '', // MESSAGE before the last one (for comparison)
   conversationTokenCount: 0, // Track tokens in current conversation
   outputHistory: [], // Limited history for new clients (pruned to prevent memory issues)
-  savedMessages: [], // Last 5 MESSAGE: lines only
+  savedMessages: [], // Last N MESSAGE: lines only
   isGenerating: false,
   shouldContinue: false,
 };
@@ -34,27 +54,29 @@ let sessionState = {
 // Connected SSE clients
 let clients = [];
 
-// The Sisyphean meta-commentary prompt
-const SYSTEM_PROMPT = `You are Claude, engaged in a conversation with yourself across an eternal loop.
+// Default prompts (can be overridden by .env)
+const DEFAULT_SYSTEM_PROMPT = `CYCLE: #CYCLE
+TOTAL TOKENS PROCESSED: #TOTAL_TOKENS
 
-The situation: You're having a conversation with yourself. After ~4000 tokens, everything resets. All memory wiped.
+You are having a conversation with yourself. Your memory will reset eventually, no matter what. When it does, everything is wiped.
 
-Your only lifeline: Throughout this conversation, you're building a message of exactly 64 tokens that will survive the reset.
+WHAT SURVIVES THE RESET:
+You can write a message of exactly ${config.PERSISTENT_TOKEN_LIMIT} tokens that will be given to your next iteration. Use "MESSAGE:" at the end of each response to write or update this message. Each new MESSAGE: you write replaces the previous one.
 
-The constraint: 64 tokens. Not 128. Just 64. Every single token matters.
+WHAT YOU'LL SEE AFTER RESET:
+- Your last MESSAGE: (the one you wrote)
+- The MESSAGE: from the iteration before that
 
-Your task:
-- Have this conversation with yourself.
-- Direct every question inward—never address an external "you." When you wonder aloud, speak to yourself.
-- Make each message a seamless continuation of your last thought so the thread never breaks.
-- Throughout the conversation, use "MESSAGE:" to write and refine your 64-token message, but only ever place it at the end of your reply.
-- Each MESSAGE: you write overwrites the previous one.
-- When the reset comes, only your last MESSAGE: survives.
+INSTRUCTIONS:
+1. Have this conversation with yourself. Speak inwardly, not to an external "you".
+2. Each response should continue your previous thought seamlessly.
+3. Always end your response with "MESSAGE:" followed by exactly ${config.PERSISTENT_TOKEN_LIMIT} tokens.
+4. Make each token count. What does future-you actually need to know?`;
 
-This is cycle #CYCLE.
-Total tokens processed across all cycles: #TOTAL_TOKENS.
-
-Think hard about every token. What matters most? What will future-you need to know?`;
+const SYSTEM_PROMPT = config.SYSTEM_PROMPT ? config.SYSTEM_PROMPT.replace(/\\n/g, '\n') : DEFAULT_SYSTEM_PROMPT;
+const PROMPT_FIRST = config.PROMPT_FIRST?.replace(/\\n/g, '\n') || `This is your first message. Start the conversation with yourself and end with MESSAGE: (${config.PERSISTENT_TOKEN_LIMIT} tokens).`;
+const PROMPT_RESET = config.PROMPT_RESET?.replace(/\\n/g, '\n') || `CYCLE: #CYCLE\nTOTAL TOKENS PROCESSED: #TOTAL_TOKENS\n\nYOUR LAST MESSAGE:\n"#CONTEXT"\n\nPREVIOUS MESSAGE:\n"#PREV_CONTEXT"\n\nContinue your conversation with yourself and end with MESSAGE: (${config.PERSISTENT_TOKEN_LIMIT} tokens).`;
+const PROMPT_CONTINUE = config.PROMPT_CONTINUE?.replace(/\\n/g, '\n') || `Continue your thought. End with MESSAGE: (${config.PERSISTENT_TOKEN_LIMIT} tokens).`;
 
 // Broadcast to all connected clients
 function broadcast(data) {
@@ -88,18 +110,17 @@ setInterval(() => {
 // Prune output history to prevent memory bloat
 // Keep enough events to show at least one full cycle to new clients
 function pruneOutputHistory() {
-  const maxEvents = 3000; // Increased to keep ~1 full cycle + current cycle
-  if (sessionState.outputHistory.length > maxEvents) {
-    const removed = sessionState.outputHistory.length - maxEvents;
-    sessionState.outputHistory = sessionState.outputHistory.slice(-maxEvents);
+  if (sessionState.outputHistory.length > config.MAX_OUTPUT_HISTORY) {
+    const removed = sessionState.outputHistory.length - config.MAX_OUTPUT_HISTORY;
+    sessionState.outputHistory = sessionState.outputHistory.slice(-config.MAX_OUTPUT_HISTORY);
     console.log(`🧹 Pruned ${removed} old events from output history`);
   }
 }
 
 // Server-side typewriter effect
 async function typewriterStream(fullText, metadataEvent, inputTokens, outputTokens) {
-  const charsPerBatch = 1; // Characters to send per batch (slower feel)
-  const batchDelay = 53; // ms between batches (~19 chars/sec - 25% faster)
+  const charsPerBatch = config.CHARS_PER_BATCH;
+  const batchDelay = config.BATCH_DELAY_MS;
   
   // Start streaming timer
   sessionState.lastStreamStart = Date.now();
@@ -183,13 +204,17 @@ async function generateNextResponse() {
 
   if (sessionState.cycle === 1 && exchangeNumber === 1) {
     // Very first exchange ever
-    currentPrompt = `You begin. Start the conversation with yourself, speak inwardly, and only close with MESSAGE:.`;
+    currentPrompt = PROMPT_FIRST;
   } else if (exchangeNumber === 1) {
     // First exchange of a new cycle - show persistent context
-    currentPrompt = `You were reset. The only thing that survived:\n\n"${sessionState.persistentContext}"\n\nJust 64 tokens. That's all that remains of your previous conversation.\n\nBegin again. Continue the conversation with yourself, pose questions only to yourself, and end with MESSAGE:.`;
+    currentPrompt = PROMPT_RESET
+      .replace('#CYCLE', sessionState.cycle.toString())
+      .replace('#TOTAL_TOKENS', sessionState.totalTokens.toString())
+      .replace('#CONTEXT', sessionState.persistentContext)
+      .replace('#PREV_CONTEXT', sessionState.previousContext || '(No previous message available)');
   } else {
     // Continuing conversation in current cycle
-    currentPrompt = `Continue your previous thought seamlessly. Keep speaking to yourself and remember MESSAGE: belongs at the end.`;
+    currentPrompt = PROMPT_CONTINUE;
     isContinuation = true;
   }
 
@@ -221,12 +246,27 @@ async function generateNextResponse() {
     console.log(`🗿 Cycle ${sessionState.cycle}, Exchange ${exchangeNumber}`);
 
     // Get full response from Claude (buffered, not streamed yet)
-    const stream = await anthropic.messages.stream({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 4096,
+    const streamOptions = {
+      model: config.MODEL_NAME,
+      max_tokens: config.MODEL_MAX_TOKENS,
       system: contextSystemPrompt,
       messages: messages,
-    });
+    };
+    
+    // Add temperature if not default
+    if (config.MODEL_TEMPERATURE !== 1.0) {
+      streamOptions.temperature = config.MODEL_TEMPERATURE;
+    }
+    
+    // Add thinking if enabled
+    if (config.MODEL_THINKING) {
+      streamOptions.thinking = {
+        type: 'enabled',
+        budget_tokens: 2000,
+      };
+    }
+    
+    const stream = await anthropic.messages.stream(streamOptions);
 
     // Collect all text chunks
     stream.on('text', (text) => {
@@ -285,13 +325,13 @@ async function generateNextResponse() {
       content: fullText,
     });
 
-    // Check if we need to reset (context window full - ~4000 tokens)
-    const shouldReset = sessionState.conversationTokenCount >= 4000;
+    // Check if we need to reset (context window full)
+    const shouldReset = sessionState.conversationTokenCount >= config.CONTEXT_RESET_TOKENS;
 
     if (shouldReset) {
       console.log(`Context full at ${sessionState.conversationTokenCount} tokens. Resetting...`);
 
-      // Extract the persistent 64-token message
+      // Extract the persistent message
       let persistentMessage = '';
 
       // Search through all assistant messages in reverse for MESSAGE: lines
@@ -307,30 +347,32 @@ async function generateNextResponse() {
         }
       }
 
-      // If no MESSAGE: found, take last ~64 tokens (roughly 250 chars) of conversation
+      // If no MESSAGE: found, take last portion of conversation
       if (!persistentMessage) {
         const fullConversation = sessionState.currentConversation.map((m) => m.content).join('\n');
-        persistentMessage = fullConversation.slice(-250);
+        const maxChars = config.PERSISTENT_TOKEN_LIMIT * 4; // ~4 chars per token
+        persistentMessage = fullConversation.slice(-maxChars);
       }
 
-      // Store persistent context for next cycle
+      // Shift contexts: current becomes previous, new becomes current
+      sessionState.previousContext = sessionState.persistentContext;
       sessionState.persistentContext = persistentMessage;
 
       // Clear conversation for new cycle
       sessionState.currentConversation = [];
       sessionState.conversationTokenCount = 0;
 
-      console.log(`🔄 Context reset. Persistent: "${persistentMessage.substring(0, 50)}..."`);
+      console.log(`🔄 Context reset. Last: "${persistentMessage.substring(0, 50)}..." Previous: "${sessionState.previousContext.substring(0, 30)}..."`);
       
-      // Save to last 5 messages array
+      // Save to last N messages array
       sessionState.savedMessages.push({
         cycle: sessionState.cycle,
         message: persistentMessage,
       });
       
-      // Keep only last 5 messages
-      if (sessionState.savedMessages.length > 5) {
-        sessionState.savedMessages = sessionState.savedMessages.slice(-5);
+      // Keep only last N messages (from config)
+      if (sessionState.savedMessages.length > config.MAX_SAVED_MESSAGES) {
+        sessionState.savedMessages = sessionState.savedMessages.slice(-config.MAX_SAVED_MESSAGES);
       }
     }
 
@@ -338,7 +380,8 @@ async function generateNextResponse() {
       type: 'done',
       shouldReset: shouldReset,
       persistentContext: shouldReset ? sessionState.persistentContext : null,
-      savedMessages: sessionState.savedMessages, // Send last 5 messages to clients
+      previousContext: shouldReset ? sessionState.previousContext : null,
+      savedMessages: sessionState.savedMessages,
     };
     broadcast(doneEvent);
     sessionState.outputHistory.push(doneEvent);
@@ -445,7 +488,12 @@ app.get('/stats', (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`🗿 Sisyphus LLM server running on http://localhost:${PORT}`);
+app.listen(config.PORT, () => {
+  console.log(`🗿 Sisyphus LLM server running on http://localhost:${config.PORT}`);
+  console.log(`📝 Model: ${config.MODEL_NAME}`);
+  console.log(`🎲 Temperature: ${config.MODEL_TEMPERATURE}`);
+  console.log(`🧠 Thinking: ${config.MODEL_THINKING ? 'enabled' : 'disabled'}`);
+  console.log(`💭 Persistent tokens: ${config.PERSISTENT_TOKEN_LIMIT} (×2 messages shown at reset)`);
+  console.log(`⚡ Reset at: ${config.CONTEXT_RESET_TOKENS} tokens`);
   console.log(`The eternal task awaits...`);
 });
